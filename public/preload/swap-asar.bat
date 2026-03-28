@@ -3,24 +3,15 @@ chcp 65001 >nul 2>&1
 title swap-asar runner
 setlocal enabledelayedexpansion
 
-:: ============================================
-:: swap-asar.bat
-::
-:: 外部脚本，在 ZTools 退出后执行 asar 替换。
-::
-:: 用法:
-::   swap-asar.bat <resourcesDir> <ztoolsExePath> [logFilePath]
-::
-:: 流程:
-::   1. 轮询检测 ZTools 进程是否退出
-::   2. 退出后: app.asar -> app.bak.asar（备份）
-::              app.new.asar -> app.asar（替换）
-::   3. 重启 ZTools
-:: ============================================
-
 set "RESOURCES_DIR=%~1"
 set "ZTOOLS_EXE=%~2"
 set "LOG_FILE=%~3"
+set "ZTOOLS_DIR=%~dp2"
+set "PROCESS_NAME=%~nx2"
+set "APP_ASAR=%RESOURCES_DIR%\app.asar"
+set "NEW_ASAR=%RESOURCES_DIR%\app.new.asar"
+set "BAK_ASAR=%RESOURCES_DIR%\app.bak.asar"
+set "LOCK_FILE=%TEMP%\ztools_swap_asar.lock"
 
 :: ===== 日志函数 =====
 :: call :log "message"
@@ -34,8 +25,39 @@ if defined LOG_FILE (
 )
 goto :eof
 
+:is_process_running
+powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command "$targetExe = $env:ZTOOLS_EXE; $targetName = $env:PROCESS_NAME; $running = Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq $targetName -and $_.ExecutablePath -and $_.ExecutablePath -ieq $targetExe } | Select-Object -First 1; if ($running) { exit 0 } else { exit 1 }" >nul 2>&1
+if "%ERRORLEVEL%"=="0" exit /b 0
+if "%ERRORLEVEL%"=="1" exit /b 1
+tasklist /FI "IMAGENAME eq %PROCESS_NAME%" /NH 2>nul | find /i "%PROCESS_NAME%" >nul
+exit /b %ERRORLEVEL%
+
+:launch_ztools
+REM 检查是否已经有 ZTools 在运行
+call :is_process_running
+if %ERRORLEVEL%==0 (
+    call :log "检测到 ZTools 已经在运行，跳过自动启动"
+    goto :eof
+)
+call :log "=== 正在启动 ZTools：%ZTOOLS_EXE% ==="
+start "" "%ZTOOLS_EXE%"
+if errorlevel 1 (
+    call :log "错误：asar 替换成功，但启动 ZTools 失败"
+    goto :error_exit
+)
+call :log "完成：已启动 ZTools"
+goto :eof
+
 :: ===== 主流程 =====
 :start
+REM ===== 检查是否已有实例在运行 =====
+if exist "%LOCK_FILE%" (
+    REM 锁文件存在，退出
+    exit /b 0
+)
+
+REM 创建锁文件
+echo %DATE% %TIME% > "%LOCK_FILE%"
 
 call :log "============================================"
 call :log "  swap-asar.bat STARTED"
@@ -73,24 +95,27 @@ set "BAK_ASAR=%RESOURCES_DIR%\app.bak.asar"
 call :log "appAsarPath: %APP_ASAR%"
 call :log "newAsarPath: %NEW_ASAR%"
 call :log "bakAsarPath: %BAK_ASAR%"
+call :log "进程名：%PROCESS_NAME%"
 
 :: ===== 等待 ZTools 退出 =====
-call :log "Waiting for ZTools.exe to exit..."
+call :log "正在等待 %PROCESS_NAME% 退出..."
 set WAIT_COUNT=0
 
 :wait_loop
-tasklist /FI "IMAGENAME eq ZTools.exe" /NH 2>nul | find /i "ZTools.exe" >nul
+call :is_process_running
 if %ERRORLEVEL%==0 (
     set /a WAIT_COUNT+=1
     set /a MOD=WAIT_COUNT %% 10
     if !MOD!==0 (
         set /a SECONDS=WAIT_COUNT
-        call :log "Still waiting... (!SECONDS!s)"
+        call :log "仍在等待...（!SECONDS! 秒）"
     )
     timeout /t 1 /nobreak >nul 2>&1
     goto :wait_loop
 )
-call :log "ZTools.exe has exited!"
+call :log "%PROCESS_NAME% 已退出"
+call :log "等待 3 秒，确保文件句柄释放..."
+timeout /t 3 /nobreak >nul 2>&1
 
 :: ===== 开始替换 =====
 call :log "=== Starting asar swap ==="
@@ -136,26 +161,24 @@ if errorlevel 1 (
 call :log "  OK: Swap complete"
 
 :: ===== 重启 ZTools =====
-call :log "=== Launching ZTools: %ZTOOLS_EXE% ==="
-start "" "%ZTOOLS_EXE%"
-if errorlevel 1 (
-    call :log "ERROR: Failed to launch ZTools"
-    goto :error_exit
-)
-call :log "OK: ZTools launched"
+call :launch_ztools
+
+REM 删除锁文件
+if exist "%LOCK_FILE%" del "%LOCK_FILE%" 2>nul
 
 call :log "============================================"
-call :log "  swap-asar.bat COMPLETED SUCCESSFULLY"
+call :log "  swap-asar.bat 执行成功"
 call :log "============================================"
 
-:: 成功，3秒后自动关闭
 echo.
-echo Done! Window will close in 3 seconds...
-timeout /t 3 /nobreak >nul 2>&1
+echo 操作已完成！按任意键关闭窗口...
+pause >nul
 exit /b 0
 
 :: ===== 错误退出 =====
 :error_exit
+REM 删除锁文件
+if exist "%LOCK_FILE%" del "%LOCK_FILE%" 2>nul
 echo.
 echo ============================================
 echo   [ERROR] Script failed! See above for details.

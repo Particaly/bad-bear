@@ -1,0 +1,361 @@
+export type Platform = 'win32' | 'darwin' | 'linux' | string
+
+export interface PluginFeatureCommand {
+  type?: string
+  label?: string
+  [key: string]: unknown
+}
+
+export interface PluginFeature {
+  code: string
+  name?: string
+  explain?: string
+  icon?: string
+  cmds?: Array<string | PluginFeatureCommand>
+  [key: string]: unknown
+}
+
+export interface PluginMarketCategoryDto {
+  key: string
+  title: string
+  description?: string
+  icon?: string
+  list: string[]
+}
+
+export interface PluginMarketPluginDto {
+  name: string
+  version: string
+  title?: string
+  description?: string
+  author?: string
+  main?: string
+  logo?: string
+  preload?: string
+  features?: PluginFeature[]
+  categories?: string[]
+  categoryFallback?: boolean
+  downloadUrl?: string
+}
+
+export interface PluginMarketPluginReference {
+  name: string
+}
+
+export interface PluginMarketPlugin {
+  name: string
+  version: string
+  title?: string
+  description?: string
+  logo?: string
+  downloadUrl?: string
+  platform?: Platform[]
+  author?: string
+  homepage?: string
+  size?: number
+  totalDownloads?: number
+  avgRating?: number
+  ratingCount?: number
+  features?: PluginFeature[]
+  main?: string
+  preload?: string
+  categories?: string[]
+  categoryFallback?: boolean
+}
+
+export interface InjectedPluginRecord {
+  name: string
+  path?: string
+  version?: string
+  [key: string]: unknown
+}
+
+export interface InstalledPlugin {
+  name: string
+  path: string
+  version: string
+  title?: string
+  description?: string
+  logo?: string
+  features?: PluginFeature[]
+  author?: string
+  homepage?: string
+  size?: number
+  isDevelopment?: boolean
+  installedAt?: string
+  [key: string]: unknown
+}
+
+export interface OperationResult {
+  success: boolean
+  error?: string
+}
+
+export interface PluginMutationResult extends OperationResult {
+  plugin?: InstalledPlugin
+}
+
+export interface PluginReadmeResponse extends OperationResult {
+  content?: string
+}
+
+export interface PluginPackageResult extends OperationResult {
+  filePath?: string
+}
+
+export interface HashFileResult extends OperationResult {
+  hash?: string
+  algorithm?: string
+}
+
+export interface PluginUploadPayload {
+  file: Blob
+  fileName?: string
+}
+
+export interface PluginUploadResponse extends OperationResult {
+  data?: unknown
+  message?: string
+}
+
+export interface PluginMarketBannerItem {
+  image: string
+  url?: string
+}
+
+export interface StorefrontCategorySummary {
+  key: string
+  title: string
+  description?: string
+  icon?: string
+  showDescription: boolean
+  pluginCount: number
+}
+
+export interface PluginMarketStorefrontCategory {
+  key: string
+  title: string
+  description?: string
+  icon?: string
+  plugins: PluginMarketPluginReference[]
+}
+
+export interface StorefrontBannerSection {
+  type: 'banner'
+  key: string
+  items: PluginMarketBannerItem[]
+  height?: number
+}
+
+export interface StorefrontNavigationSection {
+  type: 'navigation'
+  key: string
+  title?: string
+  categories: StorefrontCategorySummary[]
+}
+
+export interface StorefrontPluginSection {
+  type: 'fixed' | 'random'
+  key: string
+  title?: string
+  plugins: PluginMarketPluginReference[]
+}
+
+export type PluginMarketStorefrontSection =
+  | StorefrontBannerSection
+  | StorefrontNavigationSection
+  | StorefrontPluginSection
+
+export interface CategoryLayoutSection {
+  type: 'list' | 'fixed' | 'random' | string
+  title?: string
+  count?: number
+  plugins?: string[]
+}
+
+export interface PluginMarketStorefront {
+  sections: PluginMarketStorefrontSection[]
+  categories: Record<string, PluginMarketStorefrontCategory>
+  categoryLayouts: Record<string, CategoryLayoutSection[]>
+}
+
+export interface PluginMarketFetchResponse extends OperationResult {
+  data?: PluginMarketPlugin[]
+  storefront?: PluginMarketStorefront
+}
+
+export interface PluginLaunchOptions {
+  path: string
+  type: 'plugin'
+  name: string
+  param: Record<string, unknown>
+}
+
+export interface PluginLaunchResult extends OperationResult {}
+
+export interface PluginMarketUiPlugin extends PluginMarketPlugin {
+  title: string
+  description: string
+  installed: boolean
+  path?: string
+  localVersion?: string
+  latestVersion?: string
+  marketPlugin?: PluginMarketPlugin
+  hasUpdate?: boolean
+  isRunning?: boolean
+  isDevelopment?: boolean
+  installedAt?: string
+}
+
+export interface InstalledViewPlugin extends PluginMarketUiPlugin {
+  installed: true
+  path: string
+  localVersion: string
+  latestVersion: string
+  installedAt?: string
+}
+
+export interface CategoryInfo {
+  key: string
+  title: string
+  description?: string
+  icon?: string
+  plugins: PluginMarketUiPlugin[]
+}
+
+export interface PluginDetailVersion {
+  id: string
+  version: string
+  hash: string
+  fileSize: number
+  downloads: number
+  createdAt: string
+}
+
+export interface PluginVersionOption {
+  label: string
+  value: string
+  buildCount: number
+}
+
+export interface PluginHashOption {
+  label: string
+  value: string
+  hash: string
+  fileSize: number
+  downloads: number
+  createdAt: string
+}
+
+export interface ResolvedPluginDownloadTarget {
+  version: string
+  hash: string | null
+  downloadMode: 'latest' | 'version' | 'hash'
+  downloadUrl: string
+  build: PluginDetailVersion | null
+  plugin: PluginMarketPlugin
+}
+
+export interface PluginDetailResponse {
+  id: string
+  name: string
+  categories: string[]
+  categoryFallback: boolean
+  avgRating: number
+  ratingCount: number
+  totalDownloads: number
+  versions: PluginDetailVersion[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PluginPageQuery {
+  page?: number
+  pageSize?: number
+}
+
+export interface PluginInteractionUser {
+  id: string
+  account: string
+  username: string
+  avatarUrl: string | null
+}
+
+export interface CreatePluginRatingRequest {
+  score: number
+}
+
+export interface PluginRatingRecord {
+  id: string
+  score: number
+  user: PluginInteractionUser
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PluginRatingsPage {
+  items: PluginRatingRecord[]
+  avgRating: number
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface CreatePluginCommentRequest {
+  content: string
+  parentId?: string
+}
+
+export interface PluginCommentRecord {
+  id: string
+  content: string
+  parentId: string | null
+  user: PluginInteractionUser
+  createdAt: string
+  updatedAt: string
+  replies?: PluginCommentRecord[]
+}
+
+export interface PluginCommentsPage {
+  items: PluginCommentRecord[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface PluginCommentTreeNode extends PluginCommentRecord {
+  replies: PluginCommentTreeNode[]
+}
+
+export interface UiStorefrontBannerSection {
+  type: 'banner'
+  key: string
+  items: PluginMarketBannerItem[]
+  height?: number
+}
+
+export interface UiStorefrontNavigationSection {
+  type: 'navigation'
+  key: string
+  title?: string
+  categories: StorefrontCategorySummary[]
+}
+
+export interface UiStorefrontPluginSection {
+  type: 'fixed' | 'random'
+  key: string
+  title?: string
+  plugins: PluginMarketUiPlugin[]
+}
+
+export type PluginMarketSectionModel =
+  | UiStorefrontBannerSection
+  | UiStorefrontNavigationSection
+  | UiStorefrontPluginSection
+
+export interface CategorySectionModel {
+  key: string
+  type: 'list' | 'fixed' | 'random'
+  title?: string
+  plugins: PluginMarketUiPlugin[]
+}

@@ -13,7 +13,11 @@
     "jsx": "preserve",
     "strict": false,
     "noImplicitAny": false,
-    "types": ["@ztools-center/ztools-api-types"]
+    "types": ["@ztools-center/ztools-api-types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "include": ["src"]
 }

@@ -17,6 +17,12 @@
 RESOURCES_DIR="$1"
 ZTOOLS_EXE="$2"
 LOG_FILE="$3"
+APP_ASAR="$RESOURCES_DIR/app.asar"
+NEW_ASAR="$RESOURCES_DIR/app.new.asar"
+BAK_ASAR="$RESOURCES_DIR/app.bak.asar"
+PROCESS_NAME="$(basename "$ZTOOLS_EXE")"
+ZTOOLS_DIR="$(dirname "$ZTOOLS_EXE")"
+LOCK_FILE="/tmp/ztools_swap_asar.lock"
 
 # ===== 日志函数 =====
 log() {
@@ -31,14 +37,43 @@ log() {
 }
 
 error_exit() {
+  # 删除锁文件
+  rm -f "$LOCK_FILE" 2>/dev/null
   echo ""
   echo "============================================"
-  echo "  [ERROR] Script failed! See above for details."
-  echo "  Press Enter to close..."
+  echo "  [错误] 脚本执行失败，请查看上方输出。"
+  echo "  按回车键关闭窗口..."
   echo "============================================"
   read -r
   exit 1
 }
+
+launch_ztools() {
+  # 检查是否已经有 ZTools 在运行
+  if pgrep -x "$PROCESS_NAME" > /dev/null 2>&1; then
+    log "检测到 ZTools 已经在运行，跳过自动启动"
+    return 0
+  fi
+  log "=== 正在启动 ZTools：$ZTOOLS_EXE ==="
+  (
+    cd "$ZTOOLS_DIR" || exit 1
+    nohup "$ZTOOLS_EXE" < /dev/null > /dev/null 2>&1 &
+  )
+  if [ $? -ne 0 ]; then
+    log "错误：asar 替换成功，但重启 ZTools 失败"
+    error_exit
+  fi
+  log "完成：已启动 ZTools"
+}
+
+# ===== 检查是否已有实例在运行 =====
+if [ -f "$LOCK_FILE" ]; then
+  # 锁文件存在，退出
+  exit 0
+fi
+
+# 创建锁文件
+date > "$LOCK_FILE"
 
 # ===== 主流程 =====
 log "============================================"
@@ -98,6 +133,8 @@ while true; do
   sleep 0.5
 done
 log "$PROCESS_NAME has exited!"
+log "Wait 3 seconds to ensure file handles are released..."
+sleep 3
 
 # ===== 开始替换 =====
 log "=== Starting asar swap ==="
@@ -145,16 +182,16 @@ fi
 log "  OK: Swap complete"
 
 # ===== 重启 ZTools =====
-log "=== Launching ZTools: $ZTOOLS_EXE ==="
-nohup "$ZTOOLS_EXE" > /dev/null 2>&1 &
-CHILD_PID=$!
-log "OK: ZTools launched with PID: $CHILD_PID"
+launch_ztools
+
+# 删除锁文件
+rm -f "$LOCK_FILE" 2>/dev/null
 
 log "============================================"
-log "  swap-asar.sh COMPLETED SUCCESSFULLY"
+log "  swap-asar.sh 执行成功"
 log "============================================"
 
 echo ""
-echo "Done! Window will close in 3 seconds..."
-sleep 3
+echo "操作已完成！按回车键关闭窗口..."
+read -r
 exit 0

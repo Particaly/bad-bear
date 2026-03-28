@@ -60,6 +60,7 @@ interface Services {
   removeDirectory: (dirPath: string) => void
   removeFile: (filePath: string) => void
   copyFile: (src: string, dest: string) => void
+  copyDirectory: (src: string, dest: string) => void
 
   spawnDetached: (args: string[], options?: SpawnDetachedOptions) => number
 }

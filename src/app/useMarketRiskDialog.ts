@@ -4,7 +4,8 @@ const MARKET_RISK_DIALOG_TITLE = '风险提示'
 const MARKET_RISK_DIALOG_KEY = 'bad-bear-market-risk-tip-dismissed'
 const MARKET_RISK_MESSAGE =
   '商店内的插件均由用户上传，无法保证一定不存在恶意软件或其他风险内容。\n\n' +
-  '安装、运行此类插件后，可能会对计算机稳定性以及相关程序的稳定性造成影响，请您自行甄别并谨慎使用。'
+  '安装、运行此类插件后，可能会对计算机稳定性以及相关程序的稳定性造成影响，请您自行甄别并谨慎使用。\n\n' +
+  '请不要上传有版权风险、破解付费的插件，本应用只是为了方便大家分享插件，如有问题随时跑路！'
 
 export function useMarketRiskDialog(options: {
   confirmAction: (params: {

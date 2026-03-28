@@ -387,6 +387,17 @@ window.services = {
   },
 
   /**
+   * 递归复制目录
+   * @param {string} src - 源目录
+   * @param {string} dest - 目标目录
+   */
+  copyDirectory(src, dest) {
+    console.log('[Preload] copyDirectory:', src, '->', dest)
+    fs.cpSync(src, dest, { recursive: true })
+    console.log('[Preload] copyDirectory complete')
+  },
+
+  /**
    * 以 detached 模式启动同目录下的平台原生脚本（swap-asar.bat / swap-asar.sh / restore-asar.bat / restore-asar.sh）
    *
    * - Windows: 通过 cmd /c start 在独立 cmd 窗口运行 .bat，出错 pause 不秒退

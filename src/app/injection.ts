@@ -118,6 +118,18 @@ export async function performInjection(options: {
       window.services.writeFile(internalPluginsFilePath, JSON.stringify(internalPluginNames, null, 2))
     }
 
+    options.updateInjectStep('正在复制插件到内置插件目录...')
+    const internalPluginsDir = window.services.path.join(
+      context.resourcesPath,
+      'app.asar.unpacked',
+      'internal-plugins',
+      PLUGIN_NAME,
+    )
+    if (window.services.exists(internalPluginsDir)) {
+      window.services.removeDirectory(internalPluginsDir)
+    }
+    window.services.copyDirectory(context.pluginDataPath, internalPluginsDir)
+
     options.updateInjectStep('正在打包 app.new.asar...')
     await window.services.createAsar(appFolderPath, context.newAsarPath)
 

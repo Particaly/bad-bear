@@ -6,7 +6,6 @@ import {
   getInstalledPlugins,
   getRunningPlugins,
 } from '../../api/pluginMarket'
-import { getInternalPluginNames } from '../../app/injection'
 import { useToast } from '../common/Toast'
 import type {
   CategoryInfo,
@@ -28,24 +27,18 @@ import PluginCard from './PluginCard.vue'
 import PluginDetail from './PluginDetail.vue'
 import RefreshButton from './RefreshButton.vue'
 import { shuffleArray } from './utils'
-import { NOTIFICATION_POLLING_INTERVAL, type ActiveNav } from './page/shared'
+import type { ActiveNav } from './page/shared'
+import { isPluginHostPermissionDeniedError } from './page/shared'
 import { usePluginMarketActions } from './page/usePluginMarketActions'
 import { usePluginMarketDetail } from './page/usePluginMarketDetail'
 import { usePluginMarketNotifications } from './page/usePluginMarketNotifications'
 import { usePluginMarketRuntime } from './page/usePluginMarketRuntime'
 import { buildMarketViewState } from './page/storefront'
 
-const props = defineProps<{
-  canUninject?: boolean
-}>()
-
-const emit = defineEmits<{
-  (e: 'request-uninject'): void
-}>()
-
 const activeNav = ref<ActiveNav>('store')
 const isLoading = ref(true)
 const loadError = ref('')
+const canUseInternalPluginApis = ref(true)
 const plugins = ref<PluginMarketUiPlugin[]>([])
 const installedPlugins = ref<InstalledPlugin[]>([])
 const installedViewPlugins = ref<InstalledViewPlugin[]>([])
@@ -55,14 +48,12 @@ const storefrontCategories = ref<Record<string, CategoryInfo>>({})
 const categoryLayouts = ref<Record<string, CategoryLayoutSection[]>>({})
 const selectedCategoryKey = ref<string | null>(null)
 const selectedPluginName = ref<string | null>(null)
-const internalPluginNames = ref<Set<string>>(new Set())
-
-function isInternalPlugin(name: string): boolean {
-  return internalPluginNames.value.has(name)
-}
-
 let reloadSelectedPluginDetailRef: () => Promise<void> = async () => {}
 let refreshNotificationsAfterAuthChangeRef: () => Promise<void> = async () => {}
+
+function isInternalPlugin(_name: string): boolean {
+  return false
+}
 
 const {
   success: showSuccessToast,
@@ -105,16 +96,32 @@ async function reloadMarket() {
   isLoading.value = true
   loadError.value = ''
 
+  const marketTask = fetchPluginMarket().catch((): PluginMarketFetchResponse => ({
+    success: false,
+    error: '无法连接到商店服务器',
+    data: [],
+    storefront: undefined,
+  }))
+  const runningTask = getRunningPlugins().catch((): string[] => [])
+  const installedTask = getInstalledPlugins()
+    .then((items) => {
+      canUseInternalPluginApis.value = true
+      return items
+    })
+    .catch((error) => {
+      if (isPluginHostPermissionDeniedError(error)) {
+        canUseInternalPluginApis.value = false
+        return []
+      }
+
+      throw error
+    })
+
   try {
     const [marketResponse, nextInstalledPlugins, nextRunningPluginPaths] = await Promise.all([
-      fetchPluginMarket().catch((): PluginMarketFetchResponse => ({
-        success: false,
-        error: '无法连接到商店服务器',
-        data: [],
-        storefront: undefined,
-      })),
-      getInstalledPlugins(),
-      getRunningPlugins(),
+      marketTask,
+      installedTask,
+      runningTask,
     ])
 
     const marketResult = marketResponse
@@ -134,8 +141,6 @@ async function reloadMarket() {
     storefrontSections.value = viewState.storefrontSections
     categoryLayouts.value = viewState.categoryLayouts
 
-    const names = getInternalPluginNames()
-    internalPluginNames.value = new Set(names)
 
     if (!marketResult.success && viewState.uiPlugins.length === 0) {
       loadError.value = '无法连接到商店服务器'
@@ -203,6 +208,7 @@ const pluginMap = computed(() => new Map(plugins.value.map((plugin) => [plugin.n
 const installedPluginMap = computed(
   () => new Map(installedViewPlugins.value.map((plugin) => [plugin.name, plugin])),
 )
+const canInstallFromMarket = computed(() => canUseInternalPluginApis.value)
 
 const hasStorefront = computed(() => storefrontSections.value.length > 0)
 const isStoreNav = computed(() => activeNav.value === 'store')
@@ -241,6 +247,7 @@ const detail = usePluginMarketDetail({
   selectedPlugin,
   selectedPluginName,
   currentUser,
+  canInstallFromMarket,
   requireShopLogin,
   notifyError,
   notifySuccess,
@@ -272,6 +279,7 @@ const actions = usePluginMarketActions({
   selectedPluginName,
   pluginDetailState,
   resolvedSelectedPluginTarget,
+  canUseInternalPluginApis,
   notifyError,
   notifySuccess,
   requireShopLogin,
@@ -307,7 +315,6 @@ const notifications = usePluginMarketNotifications({
   },
   notifyError,
   notifySuccess,
-  pollingInterval: NOTIFICATION_POLLING_INTERVAL,
 })
 
 const {
@@ -323,7 +330,7 @@ const {
   handleMarkAllNotificationsRead,
   handleGoToNotificationLogin,
   refreshNotificationsAfterAuthChange,
-  syncNotificationPolling,
+  syncNotificationStream,
 } = notifications
 
 refreshNotificationsAfterAuthChangeRef = refreshNotificationsAfterAuthChange
@@ -370,6 +377,11 @@ function handleNavClick(nav: ActiveNav): void {
     return
   }
 
+  if (nav === 'installed' && !canUseInternalPluginApis.value) {
+    activeNav.value = 'store'
+    return
+  }
+
   activeNav.value = nav
 }
 
@@ -389,10 +401,6 @@ function handleBannerClick(item: { image: string; url?: string }) {
   if (item.url && typeof window.ztools?.shellOpenExternal === 'function') {
     window.ztools.shellOpenExternal(item.url)
   }
-}
-
-function handleRequestUninject(): void {
-  emit('request-uninject')
 }
 
 function shuffleRandomSection(section: PluginMarketSectionModel): void {
@@ -453,9 +461,20 @@ watch(
   },
 )
 
+watch(canUseInternalPluginApis, (enabled) => {
+  if (!enabled && activeNav.value === 'installed') {
+    activeNav.value = 'store'
+    selectedPluginName.value = null
+  }
+})
+
 watch(activeNav, (nav) => {
   if (nav === 'installed') {
     selectedCategoryKey.value = null
+
+    if (!canUseInternalPluginApis.value) {
+      return
+    }
 
     if (selectedPluginName.value && !installedPluginMap.value.has(selectedPluginName.value)) {
       selectedPluginName.value = null
@@ -469,12 +488,12 @@ watch(activeNav, (nav) => {
     selectedPluginName.value = null
   }
 
-  syncNotificationPolling()
+  syncNotificationStream()
   void refreshNavData(nav)
 })
 
 onMounted(() => {
-  syncNotificationPolling()
+  syncNotificationStream()
   void reloadMarket()
   window.addEventListener('keydown', handleKeydown, true)
 })
@@ -501,6 +520,7 @@ onUnmounted(() => {
         <span class="side-nav-count">{{ plugins.length }}</span>
       </button>
       <button
+        v-if="canUseInternalPluginApis"
         class="side-nav-item"
         :class="{ active: activeNav === 'installed' }"
         @click="handleNavClick('installed')"
@@ -609,6 +629,7 @@ onUnmounted(() => {
                           :plugin="plugin"
                           :installing-plugin="marketBusyPluginName"
                           :can-upgrade="canUpgrade(plugin)"
+                          :can-install-from-market="canInstallFromMarket"
                           @click="openPlugin(plugin)"
                           @open="handleOpenPlugin(plugin)"
                           @download="handleInstall(plugin)"
@@ -650,6 +671,7 @@ onUnmounted(() => {
                     :plugin="plugin"
                     :installing-plugin="marketBusyPluginName"
                     :can-upgrade="canUpgrade(plugin)"
+                    :can-install-from-market="canInstallFromMarket"
                     @click="openPlugin(plugin)"
                     @open="handleOpenPlugin(plugin)"
                     @download="handleInstall(plugin)"
@@ -738,10 +760,7 @@ onUnmounted(() => {
         <div v-else-if="activeNav === 'settings'" class="panel-view scrollable-panel">
           <ApiSettingsPanel
             :base-url="shopApiBaseUrl"
-            :can-uninject="!!props.canUninject"
-            :is-restore-pending="false"
             @save="handleSaveBaseUrl"
-            @uninject="handleRequestUninject"
           />
         </div>
 
@@ -757,6 +776,7 @@ onUnmounted(() => {
               :installing-plugin-name="marketBusyPluginName"
               :plugin-map="pluginMap"
               :can-upgrade="canUpgrade"
+              :can-install-from-market="canInstallFromMarket"
               @back="closeCategory"
               @click-plugin="openPlugin"
               @open-plugin="handleOpenPlugin"
@@ -775,6 +795,7 @@ onUnmounted(() => {
             :is-running="!!mergedSelectedPlugin.isRunning"
             :is-logged-in="!!currentUser"
             :is-internal="isInternalPlugin(mergedSelectedPlugin.name)"
+            :can-install-from-market="canInstallFromMarket"
             :avg-rating="pluginDetailState.detail?.avgRating"
             :rating-count="pluginDetailState.detail?.ratingCount"
             :current-user-rating="pluginDetailState.currentUserRating?.score"

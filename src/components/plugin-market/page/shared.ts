@@ -40,7 +40,6 @@ export const ALLOWED_AVATAR_TYPES = new Set([
 ])
 export const PLUGIN_COMMENTS_PAGE_SIZE = 20
 export const NOTIFICATIONS_PAGE_SIZE = 20
-export const NOTIFICATION_POLLING_INTERVAL = 30000
 
 export interface PluginDetailState {
   detail: PluginDetailResponse | null
@@ -213,6 +212,17 @@ export function resolvePluginList(
 
 export function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
+}
+
+export function isPluginHostPermissionDeniedError(error: unknown): boolean {
+  const content =
+    typeof error === 'string'
+      ? error
+      : error instanceof Error
+        ? `${error.name} ${error.message}`
+        : ''
+
+  return content.includes('PermissionDeniedError') && content.includes('仅限内置插件调用')
 }
 
 export function toTimestamp(value?: string | null): number {

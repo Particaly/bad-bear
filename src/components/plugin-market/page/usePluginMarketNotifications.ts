@@ -3,11 +3,13 @@ import {
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  subscribeNotifications,
 } from '../../../api/notifications'
 import type { AuthUser } from '../../../types/auth'
 import type {
   NotificationFilter,
   NotificationRecord,
+  NotificationStreamEvent,
   NotificationTreeNode,
 } from '../../../types/notification'
 import type { ActiveNav, NotificationState } from './shared'
@@ -17,6 +19,8 @@ import {
   getErrorMessage,
 } from './shared'
 
+const NOTIFICATION_STREAM_RECONNECT_DELAY = 3000
+
 export function usePluginMarketNotifications(options: {
   activeNav: Ref<ActiveNav>
   authToken: Ref<string>
@@ -24,14 +28,18 @@ export function usePluginMarketNotifications(options: {
   goToAccount: () => void
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
-  pollingInterval: number
 }) {
   const notificationState = ref<NotificationState>(createEmptyNotificationState())
   const unreadNotificationTotal = ref(0)
   const readingNotificationIds = ref<string[]>([])
   const notificationTree = computed(() => buildNotificationTree(notificationState.value.items))
 
-  let notificationPollingTimer: number | null = null
+  let notificationStreamAbortController: AbortController | null = null
+  let notificationStreamReconnectTimer: number | null = null
+  let notificationStreamConnectPromise: Promise<void> | null = null
+  let notificationStreamSessionId = 0
+  let notificationRefreshPromise: Promise<void> | null = null
+  let notificationRefreshQueued = false
 
   function setNotificationReadStateById(id: string): void {
     let unreadDelta = 0
@@ -272,67 +280,157 @@ export function usePluginMarketNotifications(options: {
     await Promise.all([loadNotifications({ force: true }), refreshUnreadNotificationTotal()])
   }
 
-  function stopNotificationPolling(): void {
-    if (notificationPollingTimer !== null) {
-      window.clearInterval(notificationPollingTimer)
-      notificationPollingTimer = null
-    }
-  }
-
-  function startNotificationPolling(): void {
-    if (notificationPollingTimer !== null) {
+  async function refreshNotificationsFromStream(): Promise<void> {
+    if (notificationRefreshPromise) {
+      notificationRefreshQueued = true
       return
     }
 
-    notificationPollingTimer = window.setInterval(() => {
-      if (
-        options.activeNav.value !== 'notifications' ||
-        !options.authToken.value ||
-        !options.currentUser.value ||
-        notificationState.value.loading ||
-        notificationState.value.markingAllRead ||
-        readingNotificationIds.value.length > 0
-      ) {
-        return
+    let refreshTask: Promise<void>
+    refreshTask = (async () => {
+      do {
+        notificationRefreshQueued = false
+        await handleRefreshNotifications()
+      } while (notificationRefreshQueued)
+    })()
+
+    notificationRefreshPromise = refreshTask
+
+    try {
+      await refreshTask
+    } finally {
+      if (notificationRefreshPromise === refreshTask) {
+        notificationRefreshPromise = null
       }
-
-      void handleRefreshNotifications()
-    }, options.pollingInterval)
+    }
   }
 
-  function syncNotificationPolling(): void {
-    if (
-      options.activeNav.value === 'notifications' &&
-      options.authToken.value &&
-      options.currentUser.value
-    ) {
-      startNotificationPolling()
+  function handleNotificationStreamEvent(event: NotificationStreamEvent): void {
+    if (event.type === 'connected') {
       return
     }
 
-    stopNotificationPolling()
+    void refreshNotificationsFromStream()
+  }
+
+  function clearNotificationStreamReconnectTimer(): void {
+    if (notificationStreamReconnectTimer !== null) {
+      window.clearTimeout(notificationStreamReconnectTimer)
+      notificationStreamReconnectTimer = null
+    }
+  }
+
+  function stopNotificationStream(): void {
+    notificationStreamSessionId += 1
+    clearNotificationStreamReconnectTimer()
+    notificationStreamConnectPromise = null
+
+    if (notificationStreamAbortController) {
+      notificationStreamAbortController.abort()
+      notificationStreamAbortController = null
+    }
+  }
+
+  function scheduleNotificationStreamReconnect(): void {
+    if (
+      notificationStreamReconnectTimer !== null ||
+      !options.authToken.value ||
+      !options.currentUser.value
+    ) {
+      return
+    }
+
+    notificationStreamReconnectTimer = window.setTimeout(() => {
+      notificationStreamReconnectTimer = null
+      startNotificationStream({ resync: true })
+    }, NOTIFICATION_STREAM_RECONNECT_DELAY)
+  }
+
+  function startNotificationStream(optionsArg: { resync?: boolean } = {}): void {
+    if (
+      notificationStreamAbortController ||
+      notificationStreamConnectPromise ||
+      !options.authToken.value ||
+      !options.currentUser.value
+    ) {
+      return
+    }
+
+    const sessionId = notificationStreamSessionId
+    let connectTask: Promise<void>
+
+    connectTask = (async () => {
+      try {
+        if (optionsArg.resync || !notificationState.value.initialized) {
+          await handleRefreshNotifications()
+        }
+
+        if (
+          sessionId !== notificationStreamSessionId ||
+          !options.authToken.value ||
+          !options.currentUser.value
+        ) {
+          return
+        }
+
+        clearNotificationStreamReconnectTimer()
+
+        const controller = new AbortController()
+        notificationStreamAbortController = controller
+
+        try {
+          await subscribeNotifications({
+            signal: controller.signal,
+            onEvent: handleNotificationStreamEvent,
+          })
+        } catch (error) {
+          if (controller.signal.aborted || sessionId !== notificationStreamSessionId) {
+            return
+          }
+
+          console.warn('[PluginMarket] 通知流连接失败:', error)
+        } finally {
+          if (notificationStreamAbortController === controller) {
+            notificationStreamAbortController = null
+          }
+
+          if (!controller.signal.aborted && sessionId === notificationStreamSessionId) {
+            scheduleNotificationStreamReconnect()
+          }
+        }
+      } finally {
+        if (notificationStreamConnectPromise === connectTask) {
+          notificationStreamConnectPromise = null
+        }
+      }
+    })()
+
+    notificationStreamConnectPromise = connectTask
+  }
+
+  function syncNotificationStream(optionsArg: { resync?: boolean } = {}): void {
+    if (!options.authToken.value || !options.currentUser.value) {
+      stopNotificationStream()
+      return
+    }
+
+    if (optionsArg.resync) {
+      stopNotificationStream()
+    }
+
+    startNotificationStream(optionsArg)
   }
 
   async function refreshNotificationsAfterAuthChange(): Promise<void> {
     if (!options.authToken.value || !options.currentUser.value) {
-      stopNotificationPolling()
+      stopNotificationStream()
       notificationState.value = createEmptyNotificationState()
       unreadNotificationTotal.value = 0
       readingNotificationIds.value = []
       return
     }
 
-    await refreshUnreadNotificationTotal()
-
-    if (options.activeNav.value === 'notifications' || notificationState.value.initialized) {
-      await loadNotifications({
-        page: notificationState.value.page,
-        filter: notificationState.value.filter,
-        force: true,
-      })
-    }
-
-    syncNotificationPolling()
+    syncNotificationStream({ resync: true })
   }
 
   function handleGoToNotificationLogin(): void {
@@ -340,7 +438,7 @@ export function usePluginMarketNotifications(options: {
   }
 
   onUnmounted(() => {
-    stopNotificationPolling()
+    stopNotificationStream()
   })
 
   return {
@@ -358,7 +456,7 @@ export function usePluginMarketNotifications(options: {
     handleMarkAllNotificationsRead,
     handleGoToNotificationLogin,
     refreshNotificationsAfterAuthChange,
-    syncNotificationPolling,
-    stopNotificationPolling,
+    syncNotificationStream,
+    stopNotificationStream,
   }
 }

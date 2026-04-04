@@ -17,6 +17,7 @@ const props = defineProps<{
   installingPluginName: string | null
   pluginMap: Map<string, PluginMarketUiPlugin>
   canUpgrade: (plugin: PluginMarketUiPlugin) => boolean
+  canInstallFromMarket?: boolean
 }>()
 
 defineEmits<{
@@ -113,6 +114,7 @@ function shuffleSection(): void {
             :plugin="plugin"
             :installing-plugin="installingPluginName"
             :can-upgrade="canUpgrade(plugin)"
+            :can-install-from-market="canInstallFromMarket"
             @click="$emit('click-plugin', plugin)"
             @open="$emit('open-plugin', plugin)"
             @download="$emit('download-plugin', plugin)"

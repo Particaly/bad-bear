@@ -29,6 +29,7 @@ export function usePluginMarketActions(options: {
   selectedPluginName: Ref<string | null>
   pluginDetailState: Ref<PluginDetailState>
   resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+  canUseInternalPluginApis: Ref<boolean>
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
   requireShopLogin: (actionLabel: string) => boolean
@@ -68,6 +69,7 @@ export function usePluginMarketActions(options: {
   const isShareInProgress = computed(
     () => installedBusyAction.value === 'share' && !!installedBusyPluginName.value,
   )
+  const canInstallFromMarket = computed(() => options.canUseInternalPluginApis.value)
 
   function isShareDisabledForPlugin(pluginName: string): boolean {
     if (options.isInternalPlugin(pluginName)) {
@@ -155,8 +157,18 @@ export function usePluginMarketActions(options: {
     const isSelectedDetailPlugin =
       plugin.name === options.selectedPluginName.value && !!options.pluginDetailState.value.detail
 
-    if (!target || (isSelectedDetailPlugin && !params.preferLatest && !target.build)) {
+    if (!target) {
       options.notifyError('当前插件没有可安装的版本或构建')
+      return null
+    }
+
+    if (canInstallFromMarket.value) {
+      if (isSelectedDetailPlugin && !params.preferLatest && !target.build) {
+        options.notifyError('当前插件没有可安装的版本或构建')
+        return null
+      }
+    } else if (!target.downloadUrl) {
+      options.notifyError('当前插件没有可下载的文件')
       return null
     }
 
@@ -227,6 +239,27 @@ export function usePluginMarketActions(options: {
     return '安装所选构建失败'
   }
 
+  async function openPluginDownload(
+    plugin: PluginMarketUiPlugin,
+    params: {
+      preferLatest?: boolean
+    } = {},
+  ): Promise<void> {
+    const installPayload = requirePluginInstallPayload(plugin, params)
+    if (!installPayload?.downloadUrl) {
+      options.notifyError('当前插件没有可下载的文件')
+      return
+    }
+
+    if (typeof window.ztools?.shellOpenExternal !== 'function') {
+      options.notifyError('当前宿主未暴露下载能力')
+      return
+    }
+
+    window.ztools.shellOpenExternal(installPayload.downloadUrl)
+    options.notifySuccess(`已开始下载 ${plugin.title}`)
+  }
+
   async function handleOpenPlugin(plugin: PluginMarketUiPlugin) {
     try {
       const result = await openInstalledPlugin(plugin)
@@ -245,6 +278,11 @@ export function usePluginMarketActions(options: {
       preferLatest?: boolean
     } = {},
   ) {
+    if (!canInstallFromMarket.value) {
+      await openPluginDownload(plugin, params)
+      return
+    }
+
     if (marketBusyPluginName.value || installedBusyPluginName.value) {
       return
     }
@@ -498,6 +536,7 @@ export function usePluginMarketActions(options: {
     installedBusyPluginName,
     installedBusyAction,
     selectedPluginBusyAction,
+    canInstallFromMarket,
     canUpgrade,
     isShareDisabledForPlugin,
     handleOpenPlugin,

@@ -3,6 +3,7 @@ import {
   buildCommentTree,
   buildNotificationTree,
   createEmptyNotificationState,
+  isPluginHostPermissionDeniedError,
 } from './shared'
 import { resolvePluginInstallPayload } from '../../../api/pluginMarket'
 
@@ -64,14 +65,13 @@ describe('plugin market page helpers', () => {
     expect(tree[0].replies[0].id).toBe('reply')
   })
 
-  it('creates empty notification state defaults', () => {
-    expect(createEmptyNotificationState()).toMatchObject({
-      filter: 'ALL',
-      page: 1,
-      pageSize: 20,
-      total: 0,
-      initialized: false,
-    })
+  it('detects host permission denied errors for plugin APIs', () => {
+    expect(
+      isPluginHostPermissionDeniedError(
+        new Error('PermissionDeniedError: API "internal:get-plugins" 仅限内置插件调用'),
+      ),
+    ).toBe(true)
+    expect(isPluginHostPermissionDeniedError(new Error('普通错误'))).toBe(false)
   })
 
   it('resolves plugin install payload for selected version and build', () => {

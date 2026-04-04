@@ -5,6 +5,7 @@ defineProps<{
   plugin: PluginMarketUiPlugin
   installingPlugin: string | null
   canUpgrade: boolean
+  canInstallFromMarket?: boolean
 }>()
 
 defineEmits<{
@@ -60,7 +61,7 @@ defineEmits<{
       <button
         v-else
         class="icon-btn download-btn"
-        title="下载"
+        :title="canInstallFromMarket === false ? '下载插件文件' : '安装插件'"
         :disabled="installingPlugin === plugin.name"
         @click.stop="$emit('download')"
       >

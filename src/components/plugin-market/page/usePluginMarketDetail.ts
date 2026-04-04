@@ -29,6 +29,7 @@ export function usePluginMarketDetail(options: {
   selectedPlugin: ComputedRef<PluginMarketUiPlugin | null>
   selectedPluginName: Ref<string | null>
   currentUser: Ref<AuthUser | null>
+  canInstallFromMarket: Ref<boolean>
   requireShopLogin: (actionLabel: string) => boolean
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
@@ -87,7 +88,11 @@ export function usePluginMarketDetail(options: {
     const target = resolvedSelectedPluginTarget.value
 
     if (!plugin) {
-      return '安装插件'
+      return options.canInstallFromMarket.value ? '安装插件' : '下载插件文件'
+    }
+
+    if (!options.canInstallFromMarket.value) {
+      return target?.downloadUrl ? '下载插件文件' : '暂无可下载文件'
     }
 
     if (!target?.build) {

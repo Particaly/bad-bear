@@ -23,6 +23,7 @@ const props = defineProps<{
   hashOptions?: PluginHashOption[]
   installActionText?: string
   busyAction?: PluginDetailBusyAction
+  canInstallFromMarket?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -47,7 +48,17 @@ const installActionButtonClass = computed(() => {
 
   return compareVersions(props.localVersion, props.selectedVersion) >= 0 ? 'btn-warning' : 'btn-primary'
 })
-const installActionDisabled = computed(() => !!props.busyAction || !props.selectedBuild)
+const installActionDisabled = computed(() => {
+  if (props.busyAction) {
+    return true
+  }
+
+  if (props.canInstallFromMarket === false) {
+    return !props.selectedVersion
+  }
+
+  return !props.selectedBuild
+})
 const installActionText = computed(() => props.installActionText || '安装插件')
 const hasBuildOptions = computed(() => (props.versionOptions?.length || 0) > 0)
 const selectedVersionValue = computed(() => props.selectedVersion || '')

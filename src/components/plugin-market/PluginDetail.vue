@@ -23,6 +23,7 @@ const props = defineProps<{
   isRunning?: boolean
   isLoggedIn?: boolean
   isInternal?: boolean
+  canInstallFromMarket?: boolean
   avgRating?: number
   ratingCount?: number
   currentUserRating?: number
@@ -151,7 +152,7 @@ watch(
             </svg>
           </button>
         </template>
-        <button v-else class="icon-btn topbar-action-btn install-btn" title="安装最新版" :disabled="!!busyAction" @click="emit('install-latest')">
+        <button v-else class="icon-btn topbar-action-btn install-btn" :title="canInstallFromMarket === false ? '下载插件文件' : '安装最新版'" :disabled="!!busyAction" @click="emit('install-latest')">
           <div v-if="isBusyAction('download')" class="spinner"></div>
           <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.7893 3 19.5304 3 19V15"></path>
@@ -284,6 +285,7 @@ watch(
       :hash-options="hashOptions"
       :install-action-text="installActionText"
       :busy-action="busyAction"
+      :can-install-from-market="canInstallFromMarket"
       @update:visible="isVersionModalOpen = $event"
       @install="handleInstallAction"
       @select-version="emit('select-version', $event)"

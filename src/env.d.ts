@@ -21,31 +21,7 @@ declare module '*.vue' {
   export default component
 }
 
-interface SpawnDetachedOptions {
-  scriptName?: 'swap-asar' | 'restore-asar'
-  cwd?: string
-  env?: Record<string, string | undefined>
-}
-
 interface Services {
-  parseCode: (code: string, options?: Record<string, any>) => any
-  traverseAST: (ast: any, visitors: Record<string, any>) => void
-  generateCode: (ast: any, options?: Record<string, any>) => { code: string; map?: any }
-  transformCode: (
-    code: string,
-    visitors: Record<string, any>,
-    parseOptions?: Record<string, any>,
-    generateOptions?: Record<string, any>,
-  ) => { code: string; map?: any }
-  astTypes: any
-
-  extractAsar: (asarPath: string, destPath: string) => void
-  createAsar: (srcDir: string, destAsar: string) => Promise<void>
-  packZpx: (sourceDir: string, outputPath: string) => Promise<void>
-  packagePluginToTempZpx: (sourceDir: string) => Promise<string>
-  listAsar: (asarPath: string) => string[]
-  extractFileFromAsar: (asarPath: string, filePath: string) => Buffer
-
   readFile: (filePath: string, encoding?: string) => string
   readBinaryFile: (filePath: string) => Uint8Array
   writeFile: (filePath: string, content: string) => void
@@ -61,8 +37,8 @@ interface Services {
   removeFile: (filePath: string) => void
   copyFile: (src: string, dest: string) => void
   copyDirectory: (src: string, dest: string) => void
-
-  spawnDetached: (args: string[], options?: SpawnDetachedOptions) => number
+  packZpx: (sourceDir: string, outputPath: string) => Promise<void>
+  packagePluginToTempZpx: (sourceDir: string) => Promise<string>
 }
 
 interface ImageAnalysisResult {

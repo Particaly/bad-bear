@@ -35,3 +35,46 @@ export interface MarkAllNotificationsReadResponse {
   success?: boolean
   message?: string
 }
+
+export type NotificationStreamEventName =
+  | 'connected'
+  | 'notification.created'
+  | 'notification.read'
+  | 'notification.read-all'
+
+export interface NotificationStreamConnectedPayload {
+  message: string
+}
+
+export interface NotificationStreamReadPayload {
+  id: string
+  status: 'READ'
+  readAt: string | null
+}
+
+export interface NotificationStreamReadAllPayload {
+  updated: number
+  readAt: string | null
+}
+
+export type NotificationStreamEvent =
+  | {
+      type: 'connected'
+      id: string | null
+      data: NotificationStreamConnectedPayload
+    }
+  | {
+      type: 'notification.created'
+      id: string | null
+      data: NotificationRecord
+    }
+  | {
+      type: 'notification.read'
+      id: string | null
+      data: NotificationStreamReadPayload
+    }
+  | {
+      type: 'notification.read-all'
+      id: string | null
+      data: NotificationStreamReadAllPayload
+    }

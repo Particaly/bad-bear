@@ -1,11 +1,17 @@
 import { computed, onMounted, onUnmounted, ref, type Ref } from 'vue'
 import {
   getCurrentUser,
+  getGithubBindingStatus,
   login,
+  pollGithubDeviceBind,
+  pollGithubDeviceLogin,
   register,
+  startGithubDeviceBind,
+  startGithubDeviceLogin,
   updateMyUsername,
   uploadMyAvatar,
 } from '../../../api/auth'
+import { HttpClientError } from '../../../api/httpClient'
 import {
   buildShopApiAssetUrl,
   clearShopApiAuth,
@@ -16,6 +22,10 @@ import {
 } from '../../../config/runtimeConfig'
 import type {
   AuthUser,
+  GitHubBindingState,
+  GitHubBindingStatus,
+  GitHubDeviceFlowState,
+  GitHubDeviceStartResponse,
   LoginRequest,
   RegisterRequest,
   UpdateUsernameRequest,
@@ -29,6 +39,50 @@ import {
   validateRegisterPayload,
   validateUsername,
 } from './shared'
+
+function createEmptyGithubBindingState(): GitHubBindingState {
+  return {
+    loading: false,
+    loaded: false,
+    supported: true,
+    bound: false,
+    provider: null,
+    login: null,
+    errorMessage: '',
+  }
+}
+
+function createEmptyGithubDeviceFlowState(): GitHubDeviceFlowState {
+  return {
+    purpose: null,
+    phase: 'idle',
+    deviceSessionId: '',
+    userCode: '',
+    verificationUri: '',
+    verificationUriComplete: '',
+    expiresAt: '',
+    interval: 5,
+    retryAfterSeconds: 5,
+    errorMessage: '',
+  }
+}
+
+function toGithubBindingState(binding: GitHubBindingStatus): GitHubBindingState {
+  return {
+    loading: false,
+    loaded: true,
+    supported: true,
+    bound: !!binding.bound,
+    provider: binding.provider || null,
+    login: binding.login || null,
+    errorMessage: '',
+  }
+}
+
+function isExpiredAt(expiresAt: string): boolean {
+  const expiresTime = new Date(expiresAt).getTime()
+  return Number.isFinite(expiresTime) && Date.now() >= expiresTime
+}
 
 export function usePluginMarketRuntime(options: {
   activeNav: Ref<ActiveNav>
@@ -48,11 +102,252 @@ export function usePluginMarketRuntime(options: {
   const isRegistering = ref(false)
   const isUpdatingUsername = ref(false)
   const isUploadingAvatar = ref(false)
+  const githubBinding = ref<GitHubBindingState>(createEmptyGithubBindingState())
+  const githubDeviceFlow = ref<GitHubDeviceFlowState>(createEmptyGithubDeviceFlowState())
+  const isGithubDeviceFlowBusy = computed(
+    () => githubDeviceFlow.value.phase === 'starting' || githubDeviceFlow.value.phase === 'polling',
+  )
   const currentUserAvatarUrl = computed(() =>
     buildShopApiAssetUrl(currentUser.value?.avatarUrl, shopApiBaseUrl.value),
   )
 
   let unsubscribeRuntimeConfig: (() => void) | null = null
+  let githubDeviceFlowTimer: number | null = null
+  let githubDeviceFlowPolling = false
+
+  function clearGithubDeviceFlowTimer(): void {
+    if (githubDeviceFlowTimer !== null) {
+      window.clearTimeout(githubDeviceFlowTimer)
+      githubDeviceFlowTimer = null
+    }
+  }
+
+  function resetGithubBindingState(): void {
+    githubBinding.value = createEmptyGithubBindingState()
+  }
+
+  function resetGithubDeviceFlowState(): void {
+    clearGithubDeviceFlowTimer()
+    githubDeviceFlowPolling = false
+    githubDeviceFlow.value = createEmptyGithubDeviceFlowState()
+  }
+
+  function setGithubDeviceFlowError(message: string): void {
+    clearGithubDeviceFlowTimer()
+    githubDeviceFlowPolling = false
+    githubDeviceFlow.value = {
+      ...githubDeviceFlow.value,
+      phase: 'error',
+      errorMessage: message,
+    }
+  }
+
+  function setGithubDeviceFlowExpired(): void {
+    clearGithubDeviceFlowTimer()
+    githubDeviceFlowPolling = false
+    githubDeviceFlow.value = {
+      ...githubDeviceFlow.value,
+      phase: 'expired',
+      errorMessage: 'GitHub 授权已过期，请重新发起',
+    }
+  }
+
+  function getGithubVerificationUrl(): string {
+    return githubDeviceFlow.value.verificationUriComplete || githubDeviceFlow.value.verificationUri
+  }
+
+  function openGithubVerificationPage(params: { notifyOnUnsupported?: boolean } = {}): void {
+    const verificationUrl = getGithubVerificationUrl()
+    if (!verificationUrl) {
+      options.notifyError('未获取到 GitHub 授权地址')
+      return
+    }
+
+    if (typeof window.ztools?.shellOpenExternal === 'function') {
+      window.ztools.shellOpenExternal(verificationUrl)
+      return
+    }
+
+    if (params.notifyOnUnsupported) {
+      options.notifyError('当前环境不支持自动打开浏览器，请手动访问下方授权地址')
+    }
+  }
+
+  function applyGithubDeviceFlowStart(
+    purpose: 'login' | 'bind',
+    response: GitHubDeviceStartResponse,
+  ): void {
+    githubDeviceFlow.value = {
+      purpose,
+      phase: 'polling',
+      deviceSessionId: response.deviceSessionId,
+      userCode: response.userCode,
+      verificationUri: response.verificationUri,
+      verificationUriComplete: response.verificationUriComplete || response.verificationUri,
+      expiresAt: response.expiresAt,
+      interval: response.interval,
+      retryAfterSeconds: response.interval,
+      errorMessage: '',
+    }
+  }
+
+  function scheduleGithubDeviceFlowPoll(delaySeconds: number): void {
+    clearGithubDeviceFlowTimer()
+
+    if (
+      githubDeviceFlow.value.phase !== 'polling' ||
+      !githubDeviceFlow.value.deviceSessionId ||
+      !githubDeviceFlow.value.purpose
+    ) {
+      return
+    }
+
+    githubDeviceFlowTimer = window.setTimeout(() => {
+      void pollActiveGithubDeviceFlow()
+    }, Math.max(1, delaySeconds) * 1000)
+  }
+
+  async function refreshGithubBindingStatus(params: { silent?: boolean } = {}): Promise<void> {
+    if (!authToken.value || !currentUser.value) {
+      resetGithubBindingState()
+      return
+    }
+
+    githubBinding.value = {
+      ...githubBinding.value,
+      loading: true,
+      errorMessage: '',
+    }
+
+    try {
+      const binding = await getGithubBindingStatus()
+      githubBinding.value = toGithubBindingState(binding)
+    } catch (error) {
+      const message = getErrorMessage(error, '获取 GitHub 绑定状态失败')
+      if (error instanceof HttpClientError && (error.status === 403 || error.status === 404)) {
+        githubBinding.value = {
+          loading: false,
+          loaded: true,
+          supported: false,
+          bound: false,
+          provider: null,
+          login: null,
+          errorMessage: message,
+        }
+        if (!params.silent) {
+          options.notifyError(message)
+        }
+        return
+      }
+
+      githubBinding.value = {
+        ...githubBinding.value,
+        loading: false,
+        loaded: true,
+        supported: true,
+        bound: false,
+        provider: null,
+        login: null,
+        errorMessage: message,
+      }
+
+      if (!params.silent) {
+        options.notifyError(message)
+      }
+    }
+  }
+
+  async function pollActiveGithubDeviceFlow(): Promise<void> {
+    if (githubDeviceFlowPolling) {
+      return
+    }
+
+    const deviceFlowState = githubDeviceFlow.value
+    if (
+      deviceFlowState.phase !== 'polling' ||
+      !deviceFlowState.deviceSessionId ||
+      !deviceFlowState.purpose
+    ) {
+      return
+    }
+
+    if (isExpiredAt(deviceFlowState.expiresAt)) {
+      setGithubDeviceFlowExpired()
+      return
+    }
+
+    githubDeviceFlowPolling = true
+
+    try {
+      if (deviceFlowState.purpose === 'login') {
+        const response = await pollGithubDeviceLogin({
+          deviceSessionId: deviceFlowState.deviceSessionId,
+        })
+
+        if (response.status === 'pending') {
+          githubDeviceFlow.value = {
+            ...githubDeviceFlow.value,
+            phase: 'polling',
+            retryAfterSeconds: response.retryAfterSeconds,
+            expiresAt: response.expiresAt,
+            errorMessage: '',
+          }
+
+          if (isExpiredAt(response.expiresAt)) {
+            setGithubDeviceFlowExpired()
+            return
+          }
+
+          scheduleGithubDeviceFlowPoll(response.retryAfterSeconds)
+          return
+        }
+
+        saveShopApiRuntimeConfig({
+          token: response.token,
+          currentUser: response.user,
+        })
+        await refreshGithubBindingStatus({ silent: true })
+        resetGithubDeviceFlowState()
+        options.notifySuccess(`GitHub 登录成功，欢迎 ${response.user.username}`)
+        return
+      }
+
+      const response = await pollGithubDeviceBind({
+        deviceSessionId: deviceFlowState.deviceSessionId,
+      })
+
+      if (response.status === 'pending') {
+        githubDeviceFlow.value = {
+          ...githubDeviceFlow.value,
+          phase: 'polling',
+          retryAfterSeconds: response.retryAfterSeconds,
+          expiresAt: response.expiresAt,
+          errorMessage: '',
+        }
+
+        if (isExpiredAt(response.expiresAt)) {
+          setGithubDeviceFlowExpired()
+          return
+        }
+
+        scheduleGithubDeviceFlowPoll(response.retryAfterSeconds)
+        return
+      }
+
+      githubBinding.value = toGithubBindingState(response.binding)
+      resetGithubDeviceFlowState()
+      options.notifySuccess('GitHub 已绑定')
+    } catch (error) {
+      setGithubDeviceFlowError(
+        getErrorMessage(
+          error,
+          deviceFlowState.purpose === 'login' ? 'GitHub 登录失败' : 'GitHub 绑定失败',
+        ),
+      )
+    } finally {
+      githubDeviceFlowPolling = false
+    }
+  }
 
   function applyRuntimeConfigState(config: ShopApiRuntimeConfig): void {
     const previousToken = authToken.value
@@ -63,7 +358,16 @@ export function usePluginMarketRuntime(options: {
     currentUser.value = config.currentUser ? { ...config.currentUser } : null
 
     const nextUserId = currentUser.value?.id || null
-    if (previousToken !== authToken.value || previousUserId !== nextUserId) {
+    const authChanged = previousToken !== authToken.value || previousUserId !== nextUserId
+
+    if (!authToken.value || !currentUser.value) {
+      resetGithubBindingState()
+      resetGithubDeviceFlowState()
+    } else if (authChanged) {
+      void refreshGithubBindingStatus({ silent: true })
+    }
+
+    if (authChanged) {
       void options.onAuthChanged()
     }
   }
@@ -76,6 +380,7 @@ export function usePluginMarketRuntime(options: {
     try {
       const response = await getCurrentUser()
       saveShopApiRuntimeConfig({ currentUser: response.user })
+      await refreshGithubBindingStatus({ silent: true })
     } catch (error) {
       if (!params.silent) {
         options.notifyError(getErrorMessage(error, '获取当前用户失败'))
@@ -90,6 +395,35 @@ export function usePluginMarketRuntime(options: {
 
     options.activeNav.value = 'account'
     options.notifyError(`请先登录后再${actionLabel}`)
+    return false
+  }
+
+  async function ensureGithubBound(actionLabel: string): Promise<boolean> {
+    if (!authToken.value || !currentUser.value) {
+      return false
+    }
+
+    if (githubBinding.value.loading || !githubBinding.value.loaded) {
+      await refreshGithubBindingStatus({ silent: true })
+    }
+
+    if (githubBinding.value.bound) {
+      return true
+    }
+
+    options.activeNav.value = 'account'
+
+    if (!githubBinding.value.supported && githubBinding.value.errorMessage) {
+      options.notifyError(githubBinding.value.errorMessage)
+      return false
+    }
+
+    if (githubBinding.value.errorMessage) {
+      options.notifyError(githubBinding.value.errorMessage)
+      return false
+    }
+
+    options.notifyError(`请先绑定 GitHub 后再${actionLabel}`)
     return false
   }
 
@@ -143,7 +477,69 @@ export function usePluginMarketRuntime(options: {
     }
   }
 
+  async function startGithubDeviceFlow(purpose: 'login' | 'bind'): Promise<void> {
+    if (githubDeviceFlow.value.phase === 'starting' || githubDeviceFlow.value.phase === 'polling') {
+      return
+    }
+
+    githubDeviceFlow.value = {
+      ...createEmptyGithubDeviceFlowState(),
+      purpose,
+      phase: 'starting',
+    }
+
+    try {
+      const response =
+        purpose === 'login' ? await startGithubDeviceLogin() : await startGithubDeviceBind()
+      applyGithubDeviceFlowStart(purpose, response)
+      openGithubVerificationPage()
+      scheduleGithubDeviceFlowPoll(response.interval)
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        purpose === 'login' ? '发起 GitHub 登录失败' : '发起 GitHub 绑定失败',
+      )
+
+      if (purpose === 'bind' && error instanceof HttpClientError && (error.status === 403 || error.status === 404)) {
+        githubBinding.value = {
+          loading: false,
+          loaded: true,
+          supported: false,
+          bound: false,
+          provider: null,
+          login: null,
+          errorMessage: message,
+        }
+      }
+
+      setGithubDeviceFlowError(message)
+      options.notifyError(message)
+    }
+  }
+
+  async function handleGithubLogin(): Promise<void> {
+    await startGithubDeviceFlow('login')
+  }
+
+  async function handleGithubBind(): Promise<void> {
+    if (!requireShopLogin('绑定 GitHub')) {
+      return
+    }
+
+    await startGithubDeviceFlow('bind')
+  }
+
+  function handleCancelGithubDeviceFlow(): void {
+    resetGithubDeviceFlowState()
+  }
+
+  function handleOpenGithubVerificationPage(): void {
+    openGithubVerificationPage({ notifyOnUnsupported: true })
+  }
+
   function handleLogout(): void {
+    resetGithubBindingState()
+    resetGithubDeviceFlowState()
     clearShopApiAuth()
     options.notifySuccess('已退出登录')
   }
@@ -220,6 +616,7 @@ export function usePluginMarketRuntime(options: {
   })
 
   onUnmounted(() => {
+    resetGithubDeviceFlowState()
     unsubscribeRuntimeConfig?.()
   })
 
@@ -233,11 +630,20 @@ export function usePluginMarketRuntime(options: {
     isRegistering,
     isUpdatingUsername,
     isUploadingAvatar,
+    githubBinding,
+    githubDeviceFlow,
+    isGithubDeviceFlowBusy,
     currentUserAvatarUrl,
     refreshCurrentUser,
+    refreshGithubBindingStatus,
     requireShopLogin,
+    ensureGithubBound,
     handleLogin,
     handleRegister,
+    handleGithubLogin,
+    handleGithubBind,
+    handleOpenGithubVerificationPage,
+    handleCancelGithubDeviceFlow,
     handleLogout,
     handleUpdateUsername,
     handleUploadAvatar,

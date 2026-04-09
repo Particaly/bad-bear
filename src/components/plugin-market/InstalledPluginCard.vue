@@ -5,6 +5,7 @@ const props = defineProps<{
   plugin: InstalledViewPlugin
   isBusy?: boolean
   shareDisabled?: boolean
+  shareTitle?: string
   isInternal?: boolean
 }>()
 
@@ -95,7 +96,12 @@ const emit = defineEmits<{
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
         </svg>
       </button>
-      <button class="icon-btn share-btn" :disabled="isBusy || shareDisabled" :title="isInternal ? '内置插件，不可分享' : '分享插件'" @click.stop="emit('share')">
+      <button
+        class="icon-btn share-btn"
+        :disabled="isBusy || shareDisabled"
+        :title="isInternal ? '内置插件，不可分享' : shareTitle || '分享插件'"
+        @click.stop="emit('share')"
+      >
         <div v-if="isBusy" class="spinner"></div>
         <svg
           v-else

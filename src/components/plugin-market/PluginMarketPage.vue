@@ -193,11 +193,19 @@ const {
   isRegistering,
   isUpdatingUsername,
   isUploadingAvatar,
+  githubBinding,
+  githubDeviceFlow,
+  isGithubDeviceFlowBusy,
   currentUserAvatarUrl,
   refreshCurrentUser,
   requireShopLogin,
+  ensureGithubBound,
   handleLogin,
   handleRegister,
+  handleGithubLogin,
+  handleGithubBind,
+  handleOpenGithubVerificationPage,
+  handleCancelGithubDeviceFlow,
   handleLogout,
   handleUpdateUsername,
   handleUploadAvatar,
@@ -283,6 +291,7 @@ const actions = usePluginMarketActions({
   notifyError,
   notifySuccess,
   requireShopLogin,
+  ensureGithubBound,
   confirmAction,
   reloadMarket: () => reloadMarket(),
   openPluginByName,
@@ -296,6 +305,7 @@ const {
   selectedPluginBusyAction,
   canUpgrade,
   isShareDisabledForPlugin,
+  getShareTitleForPlugin: buildShareTitle,
   handleOpenPlugin,
   handleInstall,
   handleInstallLatest,
@@ -350,6 +360,30 @@ const notificationBadgeText = computed(() => {
 
   return String(unreadNotificationTotal.value)
 })
+
+function isShareUnavailableForPlugin(pluginName: string): boolean {
+  if (isShareDisabledForPlugin(pluginName)) {
+    return true
+  }
+
+  if (!currentUser.value) {
+    return true
+  }
+
+  return !githubBinding.value.bound
+}
+
+function getShareTitleForPlugin(pluginName: string): string {
+  return buildShareTitle({
+    pluginName,
+    isInternal: isInternalPlugin(pluginName),
+    isLoggedIn: !!currentUser.value,
+    githubBound: githubBinding.value.bound,
+    githubBindingLoading: githubBinding.value.loading,
+    githubBindingError: githubBinding.value.errorMessage,
+    githubBindingSupported: githubBinding.value.supported,
+  })
+}
 
 function refreshNavData(nav: ActiveNav): Promise<void> {
   if (nav === 'store' || nav === 'installed') {
@@ -563,7 +597,7 @@ onUnmounted(() => {
             <div class="side-nav-user-account">{{ currentUser.account }}</div>
           </div>
         </div>
-        <div v-else class="side-nav-guest">登录后可分享已安装的非内置插件</div>
+        <div v-else class="side-nav-guest">更多功能登录后可用</div>
       </div>
     </aside>
 
@@ -701,7 +735,8 @@ onUnmounted(() => {
                   :key="plugin.path"
                   :plugin="plugin"
                   :is-busy="installedBusyPluginName === plugin.name"
-                  :share-disabled="isShareDisabledForPlugin(plugin.name)"
+                  :share-disabled="isShareUnavailableForPlugin(plugin.name)"
+                  :share-title="getShareTitleForPlugin(plugin.name)"
                   :is-internal="isInternalPlugin(plugin.name)"
                   @click="openPlugin(plugin)"
                   @open="handleOpenPlugin(plugin)"
@@ -724,8 +759,15 @@ onUnmounted(() => {
             :is-registering="isRegistering"
             :is-updating-username="isUpdatingUsername"
             :is-uploading-avatar="isUploadingAvatar"
+            :github-binding="githubBinding"
+            :github-device-flow="githubDeviceFlow"
+            :is-github-device-flow-busy="isGithubDeviceFlowBusy"
             @login="handleLogin"
             @register="handleRegister"
+            @github-login="handleGithubLogin"
+            @github-bind="handleGithubBind"
+            @github-open-verification="handleOpenGithubVerificationPage"
+            @github-cancel-device-flow="handleCancelGithubDeviceFlow"
             @logout="handleLogout"
             @update-username="handleUpdateUsername"
             @upload-avatar="handleUploadAvatar"
@@ -791,7 +833,8 @@ onUnmounted(() => {
             v-if="mergedSelectedPlugin"
             :plugin="mergedSelectedPlugin"
             :busy-action="selectedPluginBusyAction"
-            :share-disabled="isShareDisabledForPlugin(mergedSelectedPlugin.name)"
+            :share-disabled="isShareUnavailableForPlugin(mergedSelectedPlugin.name)"
+            :share-title="getShareTitleForPlugin(mergedSelectedPlugin.name)"
             :is-running="!!mergedSelectedPlugin.isRunning"
             :is-logged-in="!!currentUser"
             :is-internal="isInternalPlugin(mergedSelectedPlugin.name)"

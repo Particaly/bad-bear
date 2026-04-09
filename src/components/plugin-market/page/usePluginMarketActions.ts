@@ -33,6 +33,7 @@ export function usePluginMarketActions(options: {
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
   requireShopLogin: (actionLabel: string) => boolean
+  ensureGithubBound: (actionLabel: string) => Promise<boolean>
   confirmAction: (params: {
     title?: string
     message: string
@@ -77,6 +78,42 @@ export function usePluginMarketActions(options: {
     }
 
     return isShareInProgress.value && installedBusyPluginName.value !== pluginName
+  }
+
+  function getShareTitleForPlugin(params: {
+    pluginName: string
+    isInternal?: boolean
+    isLoggedIn?: boolean
+    githubBound?: boolean
+    githubBindingLoading?: boolean
+    githubBindingError?: string
+    githubBindingSupported?: boolean
+  }): string {
+    if (params.isInternal || options.isInternalPlugin(params.pluginName)) {
+      return '内置插件，不可分享'
+    }
+
+    if (params.isLoggedIn === false) {
+      return '请先登录后再分享插件'
+    }
+
+    if (params.githubBindingLoading) {
+      return '正在检查 GitHub 绑定状态...'
+    }
+
+    if (params.githubBound === false) {
+      if (params.githubBindingSupported === false && params.githubBindingError) {
+        return params.githubBindingError
+      }
+
+      return params.githubBindingError || '请先绑定 GitHub 后再分享插件'
+    }
+
+    if (isShareDisabledForPlugin(params.pluginName)) {
+      return '正在分享其他插件，请稍后'
+    }
+
+    return '分享插件'
   }
 
   function canUpgrade(plugin: PluginMarketUiPlugin): boolean {
@@ -476,6 +513,10 @@ export function usePluginMarketActions(options: {
       return
     }
 
+    if (!(await options.ensureGithubBound('分享插件'))) {
+      return
+    }
+
     if (marketBusyPluginName.value || installedBusyPluginName.value) {
       return
     }
@@ -539,6 +580,7 @@ export function usePluginMarketActions(options: {
     canInstallFromMarket,
     canUpgrade,
     isShareDisabledForPlugin,
+    getShareTitleForPlugin,
     handleOpenPlugin,
     handleInstall,
     handleInstallLatest,

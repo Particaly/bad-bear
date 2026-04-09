@@ -20,6 +20,7 @@ const props = defineProps<{
   plugin: PluginMarketUiPlugin
   busyAction?: PluginDetailBusyAction
   shareDisabled?: boolean
+  shareTitle?: string
   isRunning?: boolean
   isLoggedIn?: boolean
   isInternal?: boolean
@@ -135,7 +136,7 @@ watch(
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
           </button>
-          <button class="icon-btn topbar-action-btn share-btn" :title="isInternal ? '内置插件，不可分享' : '分享'" :disabled="!!busyAction || shareDisabled" @click="emit('share')">
+          <button class="icon-btn topbar-action-btn share-btn" :title="isInternal ? '内置插件，不可分享' : shareTitle || '分享'" :disabled="!!busyAction || shareDisabled" @click="emit('share')">
             <div v-if="isBusyAction('share')" class="spinner"></div>
             <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="18" cy="5" r="3"></circle>

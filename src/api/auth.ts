@@ -2,6 +2,11 @@ import { requestFormData, requestJson } from './httpClient'
 import type {
   AuthResponse,
   CurrentUserResponse,
+  GitHubBindDevicePollResponse,
+  GitHubBindingStatus,
+  GitHubDevicePollRequest,
+  GitHubDeviceStartResponse,
+  GitHubLoginDevicePollResponse,
   LoginRequest,
   RegisterRequest,
   UpdateUsernameRequest,
@@ -20,6 +25,46 @@ export function login(payload: LoginRequest): Promise<AuthResponse> {
     path: '/api/v1/auth/login',
     method: 'POST',
     body: payload,
+  })
+}
+
+export function startGithubDeviceLogin(): Promise<GitHubDeviceStartResponse> {
+  return requestJson<GitHubDeviceStartResponse>({
+    path: '/api/v1/auth/github/device/start',
+    method: 'POST',
+  })
+}
+
+export function pollGithubDeviceLogin(
+  payload: GitHubDevicePollRequest,
+): Promise<GitHubLoginDevicePollResponse> {
+  return requestJson<GitHubLoginDevicePollResponse, GitHubDevicePollRequest>({
+    path: '/api/v1/auth/github/device/poll',
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export function startGithubDeviceBind(): Promise<GitHubDeviceStartResponse> {
+  return requestJson<GitHubDeviceStartResponse>({
+    path: '/api/v1/auth/github/bind/device/start',
+    method: 'POST',
+  })
+}
+
+export function pollGithubDeviceBind(
+  payload: GitHubDevicePollRequest,
+): Promise<GitHubBindDevicePollResponse> {
+  return requestJson<GitHubBindDevicePollResponse, GitHubDevicePollRequest>({
+    path: '/api/v1/auth/github/bind/device/poll',
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export function getGithubBindingStatus(): Promise<GitHubBindingStatus> {
+  return requestJson<GitHubBindingStatus>({
+    path: '/api/v1/auth/github/binding',
   })
 }
 

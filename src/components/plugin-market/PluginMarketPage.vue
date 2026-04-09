@@ -25,6 +25,7 @@ import InstalledPluginCard from './InstalledPluginCard.vue'
 import NotificationPanel from './NotificationPanel.vue'
 import PluginCard from './PluginCard.vue'
 import PluginDetail from './PluginDetail.vue'
+import PluginUploadPanel from './PluginUploadPanel.vue'
 import RefreshButton from './RefreshButton.vue'
 import { shuffleArray } from './utils'
 import type { ActiveNav } from './page/shared'
@@ -32,6 +33,7 @@ import { isPluginHostPermissionDeniedError } from './page/shared'
 import { usePluginMarketActions } from './page/usePluginMarketActions'
 import { usePluginMarketDetail } from './page/usePluginMarketDetail'
 import { usePluginMarketNotifications } from './page/usePluginMarketNotifications'
+import { usePluginMarketUploads } from './page/usePluginMarketUploads'
 import { usePluginMarketRuntime } from './page/usePluginMarketRuntime'
 import { buildMarketViewState } from './page/storefront'
 
@@ -178,7 +180,10 @@ const runtime = usePluginMarketRuntime({
   selectedPluginName,
   notifyError,
   notifySuccess,
-  onAuthChanged: () => refreshNotificationsAfterAuthChangeRef(),
+  onAuthChanged: () => Promise.all([
+    refreshNotificationsAfterAuthChangeRef(),
+    uploadLoadRecords(),
+  ]).then(() => {}),
   onReloadMarket: () => reloadMarket(),
   onReloadSelectedPluginDetail: () => reloadSelectedPluginDetailRef(),
 })
@@ -345,6 +350,50 @@ const {
 
 refreshNotificationsAfterAuthChangeRef = refreshNotificationsAfterAuthChange
 
+const uploads = usePluginMarketUploads({
+  authToken,
+  currentUser,
+  notifyError,
+  notifySuccess,
+  confirmAction,
+  reloadMarket: () => reloadMarket(),
+})
+
+const {
+  selectedFile: uploadSelectedFile,
+  validationError: uploadValidationError,
+  hashCheckResult: uploadHashCheckResult,
+  isHashing: uploadIsHashing,
+  isCheckingHash: uploadIsCheckingHash,
+  isUploading: uploadIsUploading,
+  canUpload: uploadCanUpload,
+  uploads: uploadRecords,
+  uploadsTotal: uploadRecordsTotal,
+  uploadsPage: uploadRecordsPage,
+  uploadsLoading: uploadRecordsLoading,
+  uploadsError: uploadRecordsError,
+  deletingIds: uploadDeletingIds,
+  selectFile: uploadSelectFile,
+  computeHashAndPrecheck: uploadPrecheck,
+  performUpload: uploadPerformUpload,
+  loadUploads: uploadLoadRecords,
+  handleDeleteUpload: uploadHandleDelete,
+  resetState: uploadResetState,
+} = uploads
+
+function handleUploadSelectFile(file: File): void {
+  uploadSelectFile(file)
+}
+
+function handleUploadClearFile(): void {
+  uploadSelectFile(null)
+}
+
+function handleUploadOpenPlugin(name: string): void {
+  activeNav.value = 'store'
+  selectedPluginName.value = name
+}
+
 const showScrollableContent = computed(
   () => isListNav.value && !selectedPlugin.value && !selectedCategory.value,
 )
@@ -396,6 +445,10 @@ function refreshNavData(nav: ActiveNav): Promise<void> {
 
   if (nav === 'notifications') {
     return handleRefreshNotifications()
+  }
+
+  if (nav === 'upload' && authToken.value && currentUser.value) {
+    return uploadLoadRecords()
   }
 
   if (nav === 'account' && authToken.value && currentUser.value) {
@@ -569,6 +622,13 @@ onUnmounted(() => {
       >
         <span class="side-nav-item-label">通知</span>
         <span class="side-nav-count">{{ notificationBadgeText }}</span>
+      </button>
+      <button
+        class="side-nav-item"
+        :class="{ active: activeNav === 'upload' }"
+        @click="handleNavClick('upload')"
+      >
+        <span class="side-nav-item-label">上传</span>
       </button>
       <button
         class="side-nav-item"
@@ -750,7 +810,7 @@ onUnmounted(() => {
           </div>
         </Transition>
 
-        <div v-if="activeNav === 'account'" class="panel-view scrollable-panel">
+        <div v-if="activeNav === 'account'" class="panel-view scrollable-panel account-scroll">
           <AccountPanel
             :current-user="currentUser"
             :avatar-url="currentUserAvatarUrl"
@@ -771,6 +831,33 @@ onUnmounted(() => {
             @logout="handleLogout"
             @update-username="handleUpdateUsername"
             @upload-avatar="handleUploadAvatar"
+          />
+        </div>
+
+        <div v-else-if="activeNav === 'upload'" class="panel-view scrollable-panel">
+          <PluginUploadPanel
+            :current-user="currentUser"
+            :github-binding="githubBinding"
+            :selected-file="uploadSelectedFile"
+            :validation-error="uploadValidationError"
+            :hash-check-result="uploadHashCheckResult"
+            :is-hashing="uploadIsHashing"
+            :is-checking-hash="uploadIsCheckingHash"
+            :is-uploading="uploadIsUploading"
+            :can-upload="uploadCanUpload"
+            :uploads="uploadRecords"
+            :uploads-total="uploadRecordsTotal"
+            :uploads-page="uploadRecordsPage"
+            :uploads-loading="uploadRecordsLoading"
+            :uploads-error="uploadRecordsError"
+            :deleting-ids="uploadDeletingIds"
+            @select-file="handleUploadSelectFile"
+            @clear-file="handleUploadClearFile"
+            @precheck="uploadPrecheck"
+            @upload="uploadPerformUpload"
+            @refresh-uploads="uploadLoadRecords"
+            @delete-upload="uploadHandleDelete"
+            @open-plugin="handleUploadOpenPlugin"
           />
         </div>
 
@@ -1043,6 +1130,12 @@ onUnmounted(() => {
 .panel-view {
   position: absolute;
   inset: 0;
+}
+
+.account-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .content-hero {

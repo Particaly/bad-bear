@@ -8,15 +8,19 @@ import {
 import type {
   CreatePluginCommentRequest,
   CreatePluginRatingRequest,
+  MyPluginUploadsQuery,
+  MyPluginUploadsResponse,
   PluginCommentRecord,
   PluginCommentsPage,
   PluginDetailResponse,
+  PluginHashCheckResponse,
   PluginMarketCategoryDto,
   PluginMarketFetchResponse,
   PluginMarketPluginDto,
   PluginPageQuery,
   PluginRatingRecord,
   PluginRatingsPage,
+  PluginUploadAcceptedResponse,
   PluginUploadPayload,
   PluginUploadResponse,
 } from '../types/pluginMarket'
@@ -106,6 +110,31 @@ export function getPluginComments(
   })
 }
 
+export function checkPluginUploadHash(hash: string): Promise<PluginHashCheckResponse> {
+  return requestJson<PluginHashCheckResponse, { hash: string }>({
+    path: '/api/v1/plugins/check-hash',
+    method: 'POST',
+    body: { hash },
+  })
+}
+
+export function getMyPluginUploads(query?: MyPluginUploadsQuery): Promise<MyPluginUploadsResponse> {
+  return requestJson<MyPluginUploadsResponse>({
+    path: appendQuery('/api/v1/plugins/me/uploads', {
+      page: query?.page,
+      pageSize: query?.pageSize,
+      keyword: query?.keyword?.trim() || undefined,
+    }),
+  })
+}
+
+export function deleteMyPluginUpload(id: string): Promise<{ message?: string } | null> {
+  return requestJson<{ message?: string } | null>({
+    path: `/api/v1/plugins/me/uploads/${encodeURIComponent(id)}`,
+    method: 'DELETE',
+  })
+}
+
 export function createPluginComment(
   name: string,
   payload: CreatePluginCommentRequest,
@@ -132,7 +161,7 @@ export async function uploadPluginPackage(
   })
 
   try {
-    const data = await requestFormData<unknown>({
+    const data = await requestFormData<PluginUploadAcceptedResponse>({
       path: '/api/v1/plugins/upload',
       method: 'POST',
       body: formData,
@@ -142,10 +171,8 @@ export async function uploadPluginPackage(
 
     return {
       success: true,
-      message:
-        typeof data === 'object' && data && 'message' in data && typeof data.message === 'string'
-          ? data.message
-          : '上传成功',
+      message: typeof data?.message === 'string' ? data.message : '上传成功',
+      reviewTaskId: typeof data?.reviewTaskId === 'string' ? data.reviewTaskId : undefined,
       data,
     }
   } catch (error) {

@@ -5,6 +5,9 @@ export {
   getPluginComments,
   createPluginComment,
   fetchPluginMarket,
+  checkPluginUploadHash,
+  getMyPluginUploads,
+  deleteMyPluginUpload,
   uploadPluginPackage,
 } from './pluginMarketRemote'
 

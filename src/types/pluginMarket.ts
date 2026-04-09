@@ -113,9 +113,53 @@ export interface PluginUploadPayload {
   fileName?: string
 }
 
+export interface PluginUploadAcceptedResponse {
+  message: string
+  reviewTaskId: string
+}
+
 export interface PluginUploadResponse extends OperationResult {
-  data?: unknown
+  data?: PluginUploadAcceptedResponse | unknown
   message?: string
+  reviewTaskId?: string
+}
+
+export type PluginHashCheckStatus = 'blocked' | 'processing' | 'safe' | 'exists'
+
+export interface PluginHashCheckResponse {
+  status: PluginHashCheckStatus
+  pluginName?: string
+  version?: string
+}
+
+export type MyPluginUploadStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'FAILED'
+  | 'REJECTED'
+  | 'CANCELED'
+  | 'PUBLISHED'
+
+export interface MyPluginUploadRecord {
+  id: string
+  pluginName: string
+  version: string
+  originalName: string
+  fileSize: number
+  createdAt: string
+  status: MyPluginUploadStatus
+  downloads: number
+}
+
+export interface MyPluginUploadsQuery extends PluginPageQuery {
+  keyword?: string
+}
+
+export interface MyPluginUploadsResponse {
+  items: MyPluginUploadRecord[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export interface PluginMarketBannerItem {

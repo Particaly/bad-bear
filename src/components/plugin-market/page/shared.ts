@@ -22,7 +22,7 @@ import type {
 } from '../../../types/notification'
 import { compareVersions } from '../utils'
 
-export type ActiveNav = 'store' | 'installed' | 'notifications' | 'account' | 'settings'
+export type ActiveNav = 'store' | 'installed' | 'notifications' | 'upload' | 'account' | 'settings'
 export type MarketBusyAction = 'download' | 'upgrade' | null
 export type InstalledBusyAction = 'reload' | 'share' | 'uninstall' | null
 

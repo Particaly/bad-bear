@@ -27,14 +27,17 @@ import PluginCard from './PluginCard.vue'
 import PluginDetail from './PluginDetail.vue'
 import PluginUploadPanel from './PluginUploadPanel.vue'
 import RefreshButton from './RefreshButton.vue'
-import { shuffleArray } from './utils'
+import { shuffleArray, weightedSearch } from './utils'
 import type { ActiveNav } from './page/shared'
 import { isPluginHostPermissionDeniedError } from './page/shared'
 import { usePluginMarketActions } from './page/usePluginMarketActions'
 import { usePluginMarketDetail } from './page/usePluginMarketDetail'
+import { usePluginMarketNavigation } from './page/usePluginMarketNavigation'
 import { usePluginMarketNotifications } from './page/usePluginMarketNotifications'
+import { usePluginMarketSelection } from './page/usePluginMarketSelection'
 import { usePluginMarketUploads } from './page/usePluginMarketUploads'
 import { usePluginMarketRuntime } from './page/usePluginMarketRuntime'
+import { useStoreSubInput } from './page/useStoreSubInput'
 import { buildMarketViewState } from './page/storefront'
 
 const activeNav = ref<ActiveNav>('store')
@@ -50,6 +53,7 @@ const storefrontCategories = ref<Record<string, CategoryInfo>>({})
 const categoryLayouts = ref<Record<string, CategoryLayoutSection[]>>({})
 const selectedCategoryKey = ref<string | null>(null)
 const selectedPluginName = ref<string | null>(null)
+const searchQuery = ref('')
 let reloadSelectedPluginDetailRef: () => Promise<void> = async () => {}
 let refreshNotificationsAfterAuthChangeRef: () => Promise<void> = async () => {}
 
@@ -60,13 +64,8 @@ function isInternalPlugin(_name: string): boolean {
 const {
   success: showSuccessToast,
   error: showErrorToast,
-  info: showInfoToast,
   confirm,
 } = useToast()
-
-function notify(message: string) {
-  showInfoToast(message)
-}
 
 function notifyError(message: string) {
   showErrorToast(message)
@@ -90,9 +89,35 @@ function openPluginByName(name: string) {
   selectedPluginName.value = name
 }
 
-function closePlugin() {
-  selectedPluginName.value = null
-}
+// Sub-input composable for market search
+const {
+  syncStoreSubInput,
+  focusSubInput,
+  clearSearchQuery,
+  unregisterSubInput,
+} = useStoreSubInput({
+  isStoreNav: computed(() => activeNav.value === 'store'),
+  searchQuery,
+})
+
+// Selection state composable
+const {
+  isStoreNav,
+  isInstalledNav,
+  isListNav,
+  isSearchMode,
+  showScrollableContent,
+  selectedCategory,
+  selectedPlugin,
+} = usePluginMarketSelection({
+  activeNav,
+  selectedCategoryKey,
+  selectedPluginName,
+  searchQuery,
+  plugins,
+  installedViewPlugins,
+  storefrontCategories,
+})
 
 async function reloadMarket() {
   isLoading.value = true
@@ -226,37 +251,16 @@ const installedPluginMap = computed(
 const canInstallFromMarket = computed(() => canUseInternalPluginApis.value)
 
 const hasStorefront = computed(() => storefrontSections.value.length > 0)
-const isStoreNav = computed(() => activeNav.value === 'store')
-const isInstalledNav = computed(() => activeNav.value === 'installed')
-const isListNav = computed(() => isStoreNav.value || isInstalledNav.value)
+const filteredPlugins = computed(() =>
+  weightedSearch(plugins.value, searchQuery.value, [
+    { value: (plugin) => plugin.title || plugin.name || '', weight: 10 },
+    { value: (plugin) => plugin.description || '', weight: 5 },
+  ]),
+)
 
-const selectedCategory = computed(() => {
-  if (!isStoreNav.value || !selectedCategoryKey.value) {
-    return null
-  }
-
-  return storefrontCategories.value[selectedCategoryKey.value] || null
-})
-
-const selectedPlugin = computed(() => {
-  if (!isListNav.value || !selectedPluginName.value) {
-    return null
-  }
-
-  if (isInstalledNav.value) {
-    return (
-      installedPluginMap.value.get(selectedPluginName.value) ||
-      pluginMap.value.get(selectedPluginName.value) ||
-      null
-    )
-  }
-
-  return (
-    pluginMap.value.get(selectedPluginName.value) ||
-    installedPluginMap.value.get(selectedPluginName.value) ||
-    null
-  )
-})
+function closePlugin() {
+  selectedPluginName.value = null
+}
 
 const detail = usePluginMarketDetail({
   selectedPlugin,
@@ -396,9 +400,58 @@ function handleUploadOpenPlugin(name: string): void {
   selectedPluginName.value = name
 }
 
-const showScrollableContent = computed(
-  () => isListNav.value && !selectedPlugin.value && !selectedCategory.value,
-)
+// Navigation composable
+const {
+  handleNavClick: navClick,
+  openCategory: navOpenCategory,
+  closeCategory: navCloseCategory,
+  openPlugin: navOpenPlugin,
+  closePlugin: navClosePlugin,
+} = usePluginMarketNavigation({
+  activeNav,
+  selectedCategoryKey,
+  selectedPluginName,
+  canUseInternalPluginApis,
+  clearSearchQuery,
+  refreshNavData: (nav) => {
+    if (nav === 'store' || nav === 'installed') {
+      if (isLoading.value) {
+        return Promise.resolve()
+      }
+      return reloadMarket()
+    }
+
+    if (nav === 'notifications') {
+      return handleRefreshNotifications()
+    }
+
+    if (nav === 'upload' && authToken.value && currentUser.value) {
+      return uploadLoadRecords()
+    }
+
+    if (nav === 'account' && authToken.value && currentUser.value) {
+      return refreshCurrentUser({ silent: true })
+    }
+
+    return Promise.resolve()
+  },
+})
+
+function handleNavClick(nav: ActiveNav): void {
+  navClick(nav)
+}
+
+function openCategory(category: StorefrontCategorySummary) {
+  navOpenCategory(category.key)
+}
+
+function closeCategory() {
+  navCloseCategory()
+}
+
+function openPlugin(plugin: PluginMarketUiPlugin) {
+  navOpenPlugin(plugin.name)
+}
 
 const notificationBadgeText = computed(() => {
   if (!currentUser.value) {
@@ -434,56 +487,6 @@ function getShareTitleForPlugin(pluginName: string): string {
     githubBindingError: githubBinding.value.errorMessage,
     githubBindingSupported: githubBinding.value.supported,
   })
-}
-
-function refreshNavData(nav: ActiveNav): Promise<void> {
-  if (nav === 'store' || nav === 'installed') {
-    if (isLoading.value) {
-      return Promise.resolve()
-    }
-
-    return reloadMarket()
-  }
-
-  if (nav === 'notifications') {
-    return handleRefreshNotifications()
-  }
-
-  if (nav === 'upload' && authToken.value && currentUser.value) {
-    return uploadLoadRecords()
-  }
-
-  if (nav === 'account' && authToken.value && currentUser.value) {
-    return refreshCurrentUser({ silent: true })
-  }
-
-  return Promise.resolve()
-}
-
-function handleNavClick(nav: ActiveNav): void {
-  if (activeNav.value === nav) {
-    void refreshNavData(nav)
-    return
-  }
-
-  if (nav === 'installed' && !canUseInternalPluginApis.value) {
-    activeNav.value = 'store'
-    return
-  }
-
-  activeNav.value = nav
-}
-
-function openCategory(category: StorefrontCategorySummary) {
-  selectedCategoryKey.value = category.key
-}
-
-function closeCategory() {
-  selectedCategoryKey.value = null
-}
-
-function openPlugin(plugin: PluginMarketUiPlugin) {
-  selectedPluginName.value = plugin.name
 }
 
 function handleBannerClick(item: { image: string; url?: string }) {
@@ -522,6 +525,16 @@ function getCategoryLayout(categoryKey: string): CategoryLayoutSection[] {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  const isFindShortcut =
+    event.key.toLowerCase() === 'f' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey
+
+  if (isStoreNav.value && isFindShortcut) {
+    event.preventDefault()
+    event.stopPropagation()
+    focusSubInput(true)
+    return
+  }
+
   if (event.key !== 'Escape') {
     return
   }
@@ -557,9 +570,18 @@ watch(canUseInternalPluginApis, (enabled) => {
   }
 })
 
+watch(searchQuery, (query) => {
+  if (!query.trim()) {
+    return
+  }
+
+  selectedCategoryKey.value = null
+})
+
 watch(activeNav, (nav) => {
   if (nav === 'installed') {
     selectedCategoryKey.value = null
+    clearSearchQuery()
 
     if (!canUseInternalPluginApis.value) {
       return
@@ -575,19 +597,35 @@ watch(activeNav, (nav) => {
   } else {
     selectedCategoryKey.value = null
     selectedPluginName.value = null
+    clearSearchQuery()
   }
 
+  syncStoreSubInput()
   syncNotificationStream()
-  void refreshNavData(nav)
+
+  // Refresh data for the current nav tab
+  if (nav === 'store' || nav === 'installed') {
+    if (!isLoading.value) {
+      void reloadMarket()
+    }
+  } else if (nav === 'notifications') {
+    void handleRefreshNotifications()
+  } else if (nav === 'upload' && authToken.value && currentUser.value) {
+    void uploadLoadRecords()
+  } else if (nav === 'account' && authToken.value && currentUser.value) {
+    void refreshCurrentUser({ silent: true })
+  }
 })
 
 onMounted(() => {
   syncNotificationStream()
+  syncStoreSubInput()
   void reloadMarket()
   window.addEventListener('keydown', handleKeydown, true)
 })
 
 onUnmounted(() => {
+  unregisterSubInput()
   window.removeEventListener('keydown', handleKeydown, true)
 })
 </script>
@@ -673,7 +711,42 @@ onUnmounted(() => {
             </div>
 
             <template v-else-if="activeNav === 'store'">
-              <template v-if="hasStorefront">
+              <template v-if="isSearchMode">
+                <div v-if="filteredPlugins.length === 0" class="empty-state">
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+                    <path
+                      d="M16 16L20 20"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  <span>未找到匹配的插件</span>
+                </div>
+                <div v-else class="market-grid">
+                  <PluginCard
+                    v-for="plugin in filteredPlugins"
+                    :key="plugin.name"
+                    :plugin="plugin"
+                    :installing-plugin="marketBusyPluginName"
+                    :can-upgrade="canUpgrade(plugin)"
+                    :can-install-from-market="canInstallFromMarket"
+                    @click="openPlugin(plugin)"
+                    @open="handleOpenPlugin(plugin)"
+                    @download="handleInstall(plugin)"
+                    @upgrade="handleUpgrade(plugin)"
+                  />
+                </div>
+              </template>
+
+              <template v-else-if="hasStorefront">
                 <div class="storefront">
                   <template v-for="section in storefrontSections" :key="section.key">
                     <div v-if="section.type === 'banner'" class="storefront-banner">

@@ -197,6 +197,7 @@ const {
   isLoggingIn,
   isRegistering,
   isUpdatingUsername,
+  isUpdatingPassword,
   isUploadingAvatar,
   githubBinding,
   githubDeviceFlow,
@@ -213,6 +214,7 @@ const {
   handleCancelGithubDeviceFlow,
   handleLogout,
   handleUpdateUsername,
+  handleUpdatePassword,
   handleUploadAvatar,
   handleSaveBaseUrl,
 } = runtime
@@ -818,6 +820,7 @@ onUnmounted(() => {
             :is-logging-in="isLoggingIn"
             :is-registering="isRegistering"
             :is-updating-username="isUpdatingUsername"
+            :is-updating-password="isUpdatingPassword"
             :is-uploading-avatar="isUploadingAvatar"
             :github-binding="githubBinding"
             :github-device-flow="githubDeviceFlow"
@@ -830,6 +833,7 @@ onUnmounted(() => {
             @github-cancel-device-flow="handleCancelGithubDeviceFlow"
             @logout="handleLogout"
             @update-username="handleUpdateUsername"
+            @update-password="handleUpdatePassword"
             @upload-avatar="handleUploadAvatar"
           />
         </div>

@@ -31,6 +31,15 @@ export interface UpdateUsernameRequest {
   username: string
 }
 
+export interface UpdatePasswordRequest {
+  currentPassword?: string
+  newPassword: string
+}
+
+export interface UpdatePasswordResponse {
+  message: string
+}
+
 export interface GitHubDeviceStartResponse {
   deviceSessionId: string
   userCode: string

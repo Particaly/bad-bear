@@ -115,7 +115,6 @@ function canDelete(record: MyPluginUploadRecord): boolean {
     <div class="card panel-card panel-hero">
       <div class="panel-hero-copy">
         <h2 class="panel-title">上传插件</h2>
-        <p class="panel-description">上传 .zpx 格式的插件包，上传后后台会自动完成审查和发布。</p>
       </div>
     </div>
 

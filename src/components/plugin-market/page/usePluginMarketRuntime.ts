@@ -8,6 +8,7 @@ import {
   register,
   startGithubDeviceBind,
   startGithubDeviceLogin,
+  updateMyPassword,
   updateMyUsername,
   uploadMyAvatar,
 } from '../../../api/auth'
@@ -28,6 +29,7 @@ import type {
   GitHubDeviceStartResponse,
   LoginRequest,
   RegisterRequest,
+  UpdatePasswordRequest,
   UpdateUsernameRequest,
 } from '../../../types/auth'
 import type { ShopApiRuntimeConfig } from '../../../types/runtimeConfig'
@@ -36,6 +38,7 @@ import {
   getErrorMessage,
   validateAvatarFile,
   validateLoginPayload,
+  validatePassword,
   validateRegisterPayload,
   validateUsername,
 } from './shared'
@@ -101,6 +104,7 @@ export function usePluginMarketRuntime(options: {
   const isLoggingIn = ref(false)
   const isRegistering = ref(false)
   const isUpdatingUsername = ref(false)
+  const isUpdatingPassword = ref(false)
   const isUploadingAvatar = ref(false)
   const githubBinding = ref<GitHubBindingState>(createEmptyGithubBindingState())
   const githubDeviceFlow = ref<GitHubDeviceFlowState>(createEmptyGithubDeviceFlowState())
@@ -526,6 +530,13 @@ export function usePluginMarketRuntime(options: {
       return
     }
 
+    if (githubBinding.value.bound) {
+      options.notifySuccess(
+        githubBinding.value.login ? `GitHub 已绑定：${githubBinding.value.login}` : 'GitHub 已绑定',
+      )
+      return
+    }
+
     await startGithubDeviceFlow('bind')
   }
 
@@ -562,6 +573,34 @@ export function usePluginMarketRuntime(options: {
       options.notifyError(getErrorMessage(error, '修改用户名失败'))
     } finally {
       isUpdatingUsername.value = false
+    }
+  }
+
+  async function handleUpdatePassword(payload: UpdatePasswordRequest): Promise<void> {
+    try {
+      validatePassword(payload.newPassword)
+    } catch (error) {
+      options.notifyError(getErrorMessage(error, '密码不合法'))
+      return
+    }
+
+    const requestPayload: UpdatePasswordRequest = {
+      newPassword: payload.newPassword,
+    }
+
+    if (payload.currentPassword) {
+      requestPayload.currentPassword = payload.currentPassword
+    }
+
+    isUpdatingPassword.value = true
+
+    try {
+      const response = await updateMyPassword(requestPayload)
+      options.notifySuccess(response.message || '密码已更新')
+    } catch (error) {
+      options.notifyError(getErrorMessage(error, '修改密码失败'))
+    } finally {
+      isUpdatingPassword.value = false
     }
   }
 
@@ -629,6 +668,7 @@ export function usePluginMarketRuntime(options: {
     isLoggingIn,
     isRegistering,
     isUpdatingUsername,
+    isUpdatingPassword,
     isUploadingAvatar,
     githubBinding,
     githubDeviceFlow,
@@ -646,6 +686,7 @@ export function usePluginMarketRuntime(options: {
     handleCancelGithubDeviceFlow,
     handleLogout,
     handleUpdateUsername,
+    handleUpdatePassword,
     handleUploadAvatar,
     handleSaveBaseUrl,
   }

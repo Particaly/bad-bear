@@ -9,6 +9,8 @@ import type {
   GitHubLoginDevicePollResponse,
   LoginRequest,
   RegisterRequest,
+  UpdatePasswordRequest,
+  UpdatePasswordResponse,
   UpdateUsernameRequest,
 } from '../types/auth'
 
@@ -79,6 +81,16 @@ export function updateMyUsername(
 ): Promise<CurrentUserResponse> {
   return requestJson<CurrentUserResponse, UpdateUsernameRequest>({
     path: '/api/v1/users/me/username',
+    method: 'PATCH',
+    body: payload,
+  })
+}
+
+export function updateMyPassword(
+  payload: UpdatePasswordRequest,
+): Promise<UpdatePasswordResponse> {
+  return requestJson<UpdatePasswordResponse, UpdatePasswordRequest>({
+    path: '/api/v1/users/me/password',
     method: 'PATCH',
     body: payload,
   })

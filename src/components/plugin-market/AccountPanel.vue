@@ -18,6 +18,7 @@ const props = withDefaults(
     isLoggingIn?: boolean
     isRegistering?: boolean
     isUpdatingUsername?: boolean
+    isUpdatingPassword?: boolean
     isUploadingAvatar?: boolean
     githubBinding?: GitHubBindingState
     githubDeviceFlow?: GitHubDeviceFlowState
@@ -29,6 +30,7 @@ const props = withDefaults(
     isLoggingIn: false,
     isRegistering: false,
     isUpdatingUsername: false,
+    isUpdatingPassword: false,
     isUploadingAvatar: false,
     githubBinding: () => ({
       loading: false,
@@ -60,6 +62,7 @@ const emit = defineEmits<{
   (e: 'register', payload: RegisterRequest): void
   (e: 'logout'): void
   (e: 'update-username', payload: UpdateUsernameRequest): void
+  (e: 'update-password', payload: { currentPassword?: string; newPassword: string }): void
   (e: 'upload-avatar', file: File): void
   (e: 'github-login'): void
   (e: 'github-bind'): void
@@ -76,8 +79,11 @@ const registerAccount = ref('')
 const registerUsername = ref('')
 const registerPassword = ref('')
 const usernameDraft = ref('')
+const currentPasswordDraft = ref('')
+const newPasswordDraft = ref('')
 const avatarInput = ref<HTMLInputElement | null>(null)
 const isUsernameModalOpen = ref(false)
+const isPasswordModalOpen = ref(false)
 const isAvatarModalOpen = ref(false)
 
 const busy = computed(
@@ -86,8 +92,41 @@ const busy = computed(
     props.isLoggingIn ||
     props.isRegistering ||
     props.isUpdatingUsername ||
+    props.isUpdatingPassword ||
     props.isUploadingAvatar ||
     props.isGithubDeviceFlowBusy,
+)
+
+const isGithubBindingPending = computed(
+  () => props.githubBinding.loading || (props.isGithubDeviceFlowBusy && props.githubDeviceFlow.purpose === 'bind'),
+)
+
+const githubBindingActionTitle = computed(() => {
+  if (props.githubBinding.loading) {
+    return '正在获取 GitHub 绑定状态'
+  }
+
+  if (props.isGithubDeviceFlowBusy && props.githubDeviceFlow.purpose === 'bind') {
+    return 'GitHub 绑定中...'
+  }
+
+  if (!props.githubBinding.supported) {
+    return props.githubBinding.errorMessage || '当前环境不支持 GitHub 绑定'
+  }
+
+  if (props.githubBinding.bound) {
+    return props.githubBinding.login ? `GitHub 已绑定：${props.githubBinding.login}` : 'GitHub 已绑定'
+  }
+
+  if (props.githubBinding.errorMessage) {
+    return `${props.githubBinding.errorMessage}，点击重试绑定`
+  }
+
+  return '绑定 GitHub'
+})
+
+const githubBindingActionDisabled = computed(
+  () => busy.value || isGithubBindingPending.value || !props.githubBinding.supported,
 )
 
 const githubFlowTitle = computed(() => {
@@ -178,6 +217,15 @@ watch(
 )
 
 watch(
+  () => props.isUpdatingPassword,
+  (value, previousValue) => {
+    if (previousValue && !value) {
+      closePasswordModal()
+    }
+  },
+)
+
+watch(
   () => props.isUploadingAvatar,
   (value, previousValue) => {
     if (previousValue && !value) {
@@ -216,6 +264,18 @@ function submitUsernameUpdate(): void {
   })
 }
 
+function resetPasswordDraft(): void {
+  currentPasswordDraft.value = ''
+  newPasswordDraft.value = ''
+}
+
+function submitPasswordUpdate(): void {
+  emit('update-password', {
+    currentPassword: currentPasswordDraft.value,
+    newPassword: newPasswordDraft.value,
+  })
+}
+
 function openUsernameModal(): void {
   usernameDraft.value = props.currentUser?.username || ''
   isUsernameModalOpen.value = true
@@ -223,6 +283,16 @@ function openUsernameModal(): void {
 
 function closeUsernameModal(): void {
   isUsernameModalOpen.value = false
+}
+
+function openPasswordModal(): void {
+  resetPasswordDraft()
+  isPasswordModalOpen.value = true
+}
+
+function closePasswordModal(): void {
+  isPasswordModalOpen.value = false
+  resetPasswordDraft()
 }
 
 function triggerAvatarSelect(): void {
@@ -256,7 +326,6 @@ function handleAvatarChange(event: Event): void {
     <div class="card panel-card panel-hero">
       <div class="panel-hero-copy">
         <h2 class="panel-title">账号与资料</h2>
-        <p class="panel-description">登录后可修改用户名、上传头像；分享插件前需先绑定 GitHub。</p>
       </div>
     </div>
 
@@ -315,14 +384,56 @@ function handleAvatarChange(event: Event): void {
 
             <div class="profile-main">
               <div class="profile-name-row">
-                <h3 class="profile-name">{{ currentUser.username }}</h3>
+                <button
+                  class="profile-name-btn"
+                  type="button"
+                  :disabled="busy"
+                  title="点击修改用户名"
+                  aria-label="编辑用户名"
+                  @click="openUsernameModal"
+                >
+                  <span class="profile-name">{{ currentUser.username }}</span>
+                </button>
                 <span class="profile-badge">已登录</span>
-                <button class="link-btn profile-edit-btn" type="button" :disabled="busy" @click="openUsernameModal">
-                  编辑
+                <button
+                  class="profile-password-btn"
+                  type="button"
+                  :disabled="busy"
+                  title="修改密码"
+                  aria-label="修改密码"
+                  @click="openPasswordModal"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor"><path stroke-width="1.5" d="M2 16c0-2.828 0-4.243.879-5.121C3.757 10 5.172 10 8 10h8c2.828 0 4.243 0 5.121.879C22 11.757 22 13.172 22 16s0 4.243-.879 5.121C20.243 22 18.828 22 16 22H8c-2.828 0-4.243 0-5.121-.879C2 20.243 2 18.828 2 16Z"/><path stroke-linecap="round" stroke-width="1.5" d="M6 10V8a6 6 0 0 1 11.811-1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h.009m3.982 0H12m3.991 0H16"/></g></svg>
+                </button>
+                <button
+                  class="profile-github-btn"
+                  :class="{ 'profile-github-btn--bound': githubBinding.bound }"
+                  type="button"
+                  :disabled="githubBindingActionDisabled"
+                  :title="githubBindingActionTitle"
+                  :aria-label="githubBindingActionTitle"
+                  @click="emit('github-bind')"
+                >
+                  <svg class="profile-github-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 2C6.477 2 2 6.484 2 12.017c0 4.426 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.866-.013-1.7-2.782.605-3.369-1.344-3.369-1.344-.455-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.004.07 1.531 1.033 1.531 1.033.892 1.53 2.341 1.088 2.91.832.091-.647.349-1.088.635-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.748-1.026 2.748-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .269.18.58.688.481A10.019 10.019 0 0 0 22 12.017C22 6.484 17.523 2 12 2Z"
+                    />
+                  </svg>
+                  <span v-if="isGithubBindingPending" class="profile-action-dot profile-action-dot--pending" aria-hidden="true"></span>
+                  <span v-else-if="githubBinding.bound" class="profile-action-dot profile-action-dot--success" aria-hidden="true"></span>
+                  <span
+                    v-else-if="githubBinding.errorMessage"
+                    class="profile-action-dot profile-action-dot--error"
+                    aria-hidden="true"
+                  ></span>
                 </button>
               </div>
               <div class="profile-account">账号：{{ currentUser.account }}</div>
               <div class="profile-meta">注册时间：{{ joinedAtText }}</div>
+              <div v-if="githubBinding.errorMessage && !githubBinding.bound" class="profile-github-hint">
+                {{ githubBinding.errorMessage }}
+              </div>
             </div>
           </div>
 
@@ -330,33 +441,6 @@ function handleAvatarChange(event: Event): void {
             退出登录
           </button>
         </div>
-      </div>
-
-      <div class="card panel-card github-binding-card">
-        <div class="section-header">
-          <div>
-            <h3 class="section-title">GitHub 绑定状态</h3>
-          </div>
-          <span v-if="githubBinding.bound" class="profile-badge">已绑定</span>
-        </div>
-
-        <div v-if="githubBinding.loading" class="auth-status">正在获取 GitHub 绑定状态...</div>
-        <template v-else-if="githubBinding.bound"></template>
-        <template v-else>
-          <div class="auth-status">
-            {{ githubBinding.errorMessage || '当前账号尚未绑定 GitHub，绑定后即可分享插件。' }}
-          </div>
-          <div class="action-row action-row--end">
-            <button
-              class="btn btn-md btn-primary"
-              type="button"
-              :disabled="busy || !githubBinding.supported"
-              @click="emit('github-bind')"
-            >
-              {{ isGithubDeviceFlowBusy && githubDeviceFlow.purpose === 'bind' ? '绑定中...' : '绑定 GitHub' }}
-            </button>
-          </div>
-        </template>
       </div>
 
       <input
@@ -393,6 +477,52 @@ function handleAvatarChange(event: Event): void {
               <button class="btn btn-md btn-ghost" type="button" :disabled="busy" @click="closeUsernameModal">取消</button>
               <button class="btn btn-md btn-primary" :disabled="busy" @click="submitUsernameUpdate">
                 {{ isUpdatingUsername ? '保存中...' : '保存用户名' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <Teleport to="body">
+        <div v-if="isPasswordModalOpen" class="dialog-mask" @click.self="closePasswordModal">
+          <div class="dialog-card card">
+            <div class="dialog-header">
+              <div>
+                <h3 class="dialog-title">修改密码</h3>
+                <p class="dialog-description">
+                  若账号已设置密码，请填写当前密码<br />首次通过 GitHub 登录且尚未设置本地密码时可留空
+                </p>
+              </div>
+              <button class="dialog-close" type="button" :disabled="busy" @click="closePasswordModal">×</button>
+            </div>
+
+            <label class="field-label" for="password-current-modal-input">原密码</label>
+            <input
+              id="password-current-modal-input"
+              v-model="currentPasswordDraft"
+              class="text-input"
+              type="password"
+              maxlength="72"
+              :disabled="busy"
+              placeholder="如已设置密码，请输入原密码"
+            />
+
+            <label class="field-label" for="password-new-modal-input">新密码</label>
+            <input
+              id="password-new-modal-input"
+              v-model="newPasswordDraft"
+              class="text-input"
+              type="password"
+              maxlength="72"
+              :disabled="busy"
+              placeholder="请输入新密码"
+              @keydown.enter="submitPasswordUpdate"
+            />
+
+            <div class="action-row action-row--end">
+              <button class="btn btn-md btn-ghost" type="button" :disabled="busy" @click="closePasswordModal">取消</button>
+              <button class="btn btn-md btn-primary" :disabled="busy" @click="submitPasswordUpdate">
+                {{ isUpdatingPassword ? '保存中...' : '保存密码' }}
               </button>
             </div>
           </div>
@@ -587,7 +717,6 @@ function handleAvatarChange(event: Event): void {
 .auth-card,
 .section-card,
 .github-flow-card,
-.github-binding-card,
 .github-entry-card {
   display: flex;
   flex-direction: column;
@@ -620,10 +749,11 @@ function handleAvatarChange(event: Event): void {
 }
 
 .profile-avatar-wrap:focus-visible,
-.profile-edit-btn:focus-visible {
+.profile-name-btn:focus-visible,
+.profile-password-btn:focus-visible,
+.profile-github-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #3b82f6) 22%, transparent);
-  border-radius: 18px;
 }
 
 .profile-avatar {
@@ -658,7 +788,27 @@ function handleAvatarChange(event: Event): void {
 .profile-name {
   margin: 0;
   font-size: 20px;
+  color: inherit;
+}
+
+.profile-name-btn {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
   color: var(--text-color);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.profile-name-btn:hover:not(:disabled) {
+  color: var(--primary-color);
+}
+
+.profile-name-btn:disabled {
+  cursor: not-allowed;
 }
 
 .profile-badge {
@@ -672,19 +822,69 @@ function handleAvatarChange(event: Event): void {
   font-weight: 700;
 }
 
-.profile-edit-btn {
+.profile-password-btn,
+.profile-github-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  color: var(--primary-color);
-  font-size: 13px;
-  font-weight: 700;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.profile-edit-btn:hover:not(:disabled) {
-  opacity: 0.85;
+.profile-password-btn:hover:not(:disabled),
+.profile-github-btn:hover:not(:disabled) {
+  background: var(--primary-light-bg);
+  color: var(--primary-color);
+}
+
+.profile-password-btn:disabled,
+.profile-github-btn:disabled {
+  cursor: not-allowed;
+}
+
+.profile-password-icon,
+.profile-github-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.profile-github-btn--bound {
+  color: var(--primary-color);
+}
+
+.profile-action-dot {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--surface-color, var(--card-bg));
+  border-radius: 999px;
+}
+
+.profile-action-dot--pending {
+  background: var(--warning-color, #f59e0b);
+}
+
+.profile-action-dot--success {
+  background: var(--success-color, #22c55e);
+}
+
+.profile-action-dot--error {
+  background: var(--danger-color, #ef4444);
 }
 
 .profile-account,
 .profile-meta,
+.profile-github-hint,
 .upload-description,
 .auth-status,
 .section-description {
@@ -696,8 +896,9 @@ function handleAvatarChange(event: Event): void {
   margin-top: 6px;
 }
 
-.profile-meta {
-  margin-top: 4px;
+.profile-github-hint {
+  margin-top: 6px;
+  color: var(--danger-color);
 }
 
 .profile-logout-btn {
@@ -714,24 +915,6 @@ function handleAvatarChange(event: Event): void {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 15px;
-  color: var(--text-color);
-}
-
-.section-tip {
-  color: var(--text-secondary);
-  font-size: 12px;
 }
 
 .auth-tabs {
@@ -865,8 +1048,7 @@ function handleAvatarChange(event: Event): void {
   gap: 8px;
 }
 
-.github-flow-meta > div,
-.binding-row {
+.github-flow-meta > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -875,8 +1057,7 @@ function handleAvatarChange(event: Event): void {
   font-size: 13px;
 }
 
-.github-flow-meta > div span:last-child,
-.binding-row span:last-child {
+.github-flow-meta > div span:last-child {
   color: var(--text-color);
   text-align: right;
   word-break: break-all;
@@ -970,8 +1151,6 @@ function handleAvatarChange(event: Event): void {
     align-items: flex-start;
   }
 
-  .section-header,
-  .binding-row,
   .github-flow-meta > div {
     align-items: flex-start;
     flex-direction: column;

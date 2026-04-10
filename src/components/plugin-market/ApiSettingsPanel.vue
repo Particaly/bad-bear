@@ -31,23 +31,16 @@ function submit(): void {
 
     <div class="card panel-card settings-card">
       <div class="field-group">
-        <label class="field-label" for="shop-api-base-url">API Base URL</label>
+        <label class="field-label" for="shop-api-base-url">商店后端地址</label>
         <input
           id="shop-api-base-url"
           v-model="draftBaseUrl"
           class="text-input"
           type="text"
-          placeholder="http://localhost:3000"
+          placeholder="通常来说你不需要改这个"
           @keydown.enter="submit"
         />
-        <p class="field-help">输入 localhost:3000 时会自动补全为 http://localhost:3000，并去掉结尾斜杠。</p>
       </div>
-
-      <div class="runtime-info">
-        <span class="runtime-label">当前生效地址</span>
-        <code class="runtime-value">{{ baseUrl }}</code>
-      </div>
-
       <div class="action-row">
         <button class="btn btn-md btn-primary" @click="submit">保存地址</button>
       </div>

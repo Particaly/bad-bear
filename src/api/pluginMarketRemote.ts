@@ -1,5 +1,6 @@
 import { HttpClientError, requestFormData, requestJson } from './httpClient'
 import { appendQuery } from './query'
+import { getShopApiRuntimeConfig } from '../config/runtimeConfig'
 import {
   adaptPlugin,
   buildStorefront,
@@ -16,6 +17,7 @@ import type {
   PluginHashCheckResponse,
   PluginMarketCategoryDto,
   PluginMarketFetchResponse,
+  PluginMarketPlugin,
   PluginMarketPluginDto,
   PluginPageQuery,
   PluginRatingRecord,
@@ -25,24 +27,119 @@ import type {
   PluginUploadResponse,
 } from '../types/pluginMarket'
 
-export function buildPluginPageQuery(query?: PluginPageQuery): string {
-  return appendQuery('', {
-    page: query?.page,
-    pageSize: query?.pageSize,
-  })
+const PLUGIN_MARKET_CACHE_KEY = 'bad-bear.plugin-market.cache.v1'
+
+interface PluginMarketLatestResponse {
+  latestAt: string
 }
 
-export async function fetchPluginMarket(): Promise<PluginMarketFetchResponse> {
-  const pluginResponse = await requestJson<PluginMarketPluginDto[]>({
-    path: '/api/v1/plugins',
-  })
-  const plugins = (Array.isArray(pluginResponse) ? pluginResponse : [])
-    .filter(
-      (plugin): plugin is PluginMarketPluginDto =>
-        !!plugin && typeof plugin.name === 'string' && typeof plugin.version === 'string',
-    )
-    .map(adaptPlugin)
+interface PluginMarketCacheRecord {
+  version: 1
+  latestSignature: string
+  plugins: PluginMarketPluginDto[]
+  categories: PluginMarketCategoryDto[]
+}
 
+function getPluginMarketCacheStorage(): Storage | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    return window.localStorage ?? null
+  } catch {
+    return null
+  }
+}
+
+function isPluginMarketCacheRecord(value: unknown): value is PluginMarketCacheRecord {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+  return (
+    candidate.version === 1 &&
+    typeof candidate.latestSignature === 'string' &&
+    Array.isArray(candidate.plugins) &&
+    Array.isArray(candidate.categories)
+  )
+}
+
+function buildPluginMarketCacheKey(): string {
+  const { baseUrl } = getShopApiRuntimeConfig()
+  return `${PLUGIN_MARKET_CACHE_KEY}:${baseUrl}`
+}
+
+function readPluginMarketCache(): PluginMarketCacheRecord | null {
+  const storage = getPluginMarketCacheStorage()
+  if (!storage) {
+    return null
+  }
+
+  const rawValue = storage.getItem(buildPluginMarketCacheKey())
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue)
+    return isPluginMarketCacheRecord(parsed) ? parsed : null
+  } catch {
+    storage.removeItem(buildPluginMarketCacheKey())
+    return null
+  }
+}
+
+function writePluginMarketCache(record: PluginMarketCacheRecord): void {
+  const storage = getPluginMarketCacheStorage()
+  if (!storage) {
+    return
+  }
+
+  try {
+    storage.setItem(buildPluginMarketCacheKey(), JSON.stringify(record))
+  } catch (error) {
+    console.warn('[PluginMarket] 缓存插件商店数据失败:', error)
+  }
+}
+
+function buildPluginMarketLatestSignature(value: PluginMarketLatestResponse): string {
+  return value.latestAt
+}
+
+function isPluginMarketLatestResponse(value: unknown): value is PluginMarketLatestResponse {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  return typeof (value as Record<string, unknown>).latestAt === 'string'
+}
+
+function normalizePluginDtos(pluginResponse: PluginMarketPluginDto[]): PluginMarketPluginDto[] {
+  return (Array.isArray(pluginResponse) ? pluginResponse : []).filter(
+    (plugin): plugin is PluginMarketPluginDto =>
+      !!plugin && typeof plugin.name === 'string' && typeof plugin.version === 'string',
+  )
+}
+
+function buildPluginMarketResponse(
+  pluginDtos: PluginMarketPluginDto[],
+  categoryDtos: PluginMarketCategoryDto[],
+): PluginMarketFetchResponse {
+  const plugins: PluginMarketPlugin[] = pluginDtos.map(adaptPlugin)
+  const resolvedCategoryDtos = categoryDtos.length > 0 ? categoryDtos : deriveFallbackCategories(plugins)
+
+  return {
+    success: true,
+    data: plugins,
+    storefront: buildStorefront(plugins, resolvedCategoryDtos),
+  }
+}
+
+async function fetchPluginCategoryDtos(
+  plugins: PluginMarketPlugin[],
+): Promise<PluginMarketCategoryDto[]> {
   let categoryDtos: PluginMarketCategoryDto[] = []
 
   try {
@@ -54,8 +151,51 @@ export async function fetchPluginMarket(): Promise<PluginMarketFetchResponse> {
     console.warn('[PluginMarket] 加载插件分类失败，回退到插件自带分类:', error)
   }
 
-  if (categoryDtos.length === 0) {
-    categoryDtos = deriveFallbackCategories(plugins)
+  return categoryDtos.length > 0 ? categoryDtos : deriveFallbackCategories(plugins)
+}
+
+export function buildPluginPageQuery(query?: PluginPageQuery): string {
+  return appendQuery('', {
+    page: query?.page,
+    pageSize: query?.pageSize,
+  })
+}
+
+export async function fetchPluginMarket(): Promise<PluginMarketFetchResponse> {
+  const cachedMarket = readPluginMarketCache()
+
+  let latestSignature: string | null = null
+  try {
+    const latestResponse = await requestJson<PluginMarketLatestResponse>({
+      path: '/api/v1/plugins/latest',
+    })
+    if (!isPluginMarketLatestResponse(latestResponse)) {
+      throw new Error('插件商店 latest 响应格式无效')
+    }
+
+    latestSignature = buildPluginMarketLatestSignature(latestResponse)
+
+    if (cachedMarket && cachedMarket.latestSignature === latestSignature) {
+      return buildPluginMarketResponse(cachedMarket.plugins, cachedMarket.categories)
+    }
+  } catch (error) {
+    console.warn('[PluginMarket] 检查商店更新失败，将直接拉取插件列表:', error)
+  }
+
+  const pluginResponse = await requestJson<PluginMarketPluginDto[]>({
+    path: '/api/v1/plugins',
+  })
+  const pluginDtos = normalizePluginDtos(pluginResponse)
+  const plugins = pluginDtos.map(adaptPlugin)
+  const categoryDtos = await fetchPluginCategoryDtos(plugins)
+
+  if (latestSignature !== null) {
+    writePluginMarketCache({
+      version: 1,
+      latestSignature,
+      plugins: pluginDtos,
+      categories: categoryDtos,
+    })
   }
 
   return {

@@ -9,6 +9,7 @@ import type {
   UpdateUsernameRequest,
 } from '../../types/auth'
 import { reloadTheme } from '../../config/theme'
+import { getCaptcha } from '../../api/auth'
 
 const props = withDefaults(
   defineProps<{
@@ -85,6 +86,10 @@ const avatarInput = ref<HTMLInputElement | null>(null)
 const isUsernameModalOpen = ref(false)
 const isPasswordModalOpen = ref(false)
 const isAvatarModalOpen = ref(false)
+const captchaToken = ref('')
+const captchaImage = ref('')
+const captchaCode = ref('')
+const isCaptchaLoading = ref(false)
 
 const busy = computed(
   () =>
@@ -243,11 +248,60 @@ watch(
   },
 )
 
+async function refreshCaptcha(): Promise<void> {
+  isCaptchaLoading.value = true
+  try {
+    const res = await getCaptcha()
+    captchaToken.value = res.captchaToken
+    captchaImage.value = res.image
+    captchaCode.value = ''
+  } catch {
+    // 验证码获取失败不阻塞，用户可点击刷新重试
+  } finally {
+    isCaptchaLoading.value = false
+  }
+}
+
+// 切换到登录/注册 tab 时自动获取验证码
+watch(authMode, (mode) => {
+  if (!captchaToken.value) {
+    void refreshCaptcha()
+  }
+}, { immediate: true })
+
+// 登录失败后自动刷新验证码（验证码一旦提交即失效）
+watch(() => props.isLoggingIn, (busy, wasBusy) => {
+  if (wasBusy && !busy && !props.currentUser) {
+    void refreshCaptcha()
+  }
+})
+
+// 注册失败后自动刷新验证码
+watch(() => props.isRegistering, (busy, wasBusy) => {
+  if (wasBusy && !busy && !props.currentUser) {
+    void refreshCaptcha()
+  }
+})
+
+// 登录成功后清空验证码（已失效）
+watch(() => props.currentUser, (user) => {
+  if (user) {
+    captchaToken.value = ''
+    captchaImage.value = ''
+    captchaCode.value = ''
+  }
+})
+
 function submitLogin(): void {
   emit('login', {
     account: loginAccount.value.trim(),
     password: loginPassword.value,
+    captchaToken: captchaToken.value,
+    captchaCode: captchaCode.value.trim(),
   })
+  // 提交后验证码即失效，立即清空 token 防止二次使用
+  captchaToken.value = ''
+  captchaImage.value = ''
 }
 
 function submitRegister(): void {
@@ -255,7 +309,12 @@ function submitRegister(): void {
     account: registerAccount.value.trim(),
     username: registerUsername.value.trim(),
     password: registerPassword.value,
+    captchaToken: captchaToken.value,
+    captchaCode: captchaCode.value.trim(),
   })
+  // 提交后验证码即失效，立即清空 token 防止二次使用
+  captchaToken.value = ''
+  captchaImage.value = ''
 }
 
 function submitUsernameUpdate(): void {
@@ -326,6 +385,25 @@ function handleAvatarChange(event: Event): void {
     <div class="card panel-card panel-hero">
       <div class="panel-hero-copy">
         <h2 class="panel-title">账号与资料</h2>
+      </div>
+      <div v-if="!currentUser" class="auth-tabs" :style="{ '--auth-slider-index': authMode === 'login' ? '0' : '1' }">
+        <div class="auth-tab-slider" aria-hidden="true"></div>
+        <button
+          class="auth-tab"
+          :class="{ active: authMode === 'login' }"
+          :disabled="busy"
+          @click="authMode = 'login'"
+        >
+          登录
+        </button>
+        <button
+          class="auth-tab"
+          :class="{ active: authMode === 'register' }"
+          :disabled="busy"
+          @click="authMode = 'register'"
+        >
+          注册
+        </button>
       </div>
     </div>
 
@@ -558,26 +636,6 @@ function handleAvatarChange(event: Event): void {
 
     <template v-else>
       <div class="card panel-card auth-card">
-        <div class="auth-tabs" :style="{ '--auth-slider-index': authMode === 'login' ? '0' : '1' }">
-          <div class="auth-tab-slider" aria-hidden="true"></div>
-          <button
-            class="auth-tab"
-            :class="{ active: authMode === 'login' }"
-            :disabled="busy"
-            @click="authMode = 'login'"
-          >
-            登录
-          </button>
-          <button
-            class="auth-tab"
-            :class="{ active: authMode === 'register' }"
-            :disabled="busy"
-            @click="authMode = 'register'"
-          >
-            注册
-          </button>
-        </div>
-
         <div v-if="isRestoringSession" class="auth-status">正在恢复登录状态...</div>
 
         <template v-if="authMode === 'login'">
@@ -603,6 +661,37 @@ function handleAvatarChange(event: Event): void {
             placeholder="输入密码"
             @keydown.enter="submitLogin"
           />
+
+          <label class="field-label" for="login-captcha">验证码</label>
+          <div class="captcha-row">
+            <input
+              id="login-captcha"
+              v-model="captchaCode"
+              class="text-input captcha-input"
+              type="text"
+              maxlength="10"
+              inputmode="numeric"
+              autocomplete="off"
+              :disabled="busy"
+              placeholder="计算结果"
+              @keydown.enter="submitLogin"
+            />
+            <button
+              class="captcha-image-btn"
+              type="button"
+              :disabled="isCaptchaLoading"
+              title="点击刷新验证码"
+              @click="refreshCaptcha"
+            >
+              <img
+                v-if="captchaImage && !isCaptchaLoading"
+                :src="captchaImage"
+                alt="验证码"
+                class="captcha-image"
+              />
+              <span v-else class="captcha-placeholder">...</span>
+            </button>
+          </div>
 
           <div class="action-row action-row--end auth-login-actions">
             <button
@@ -662,6 +751,37 @@ function handleAvatarChange(event: Event): void {
             placeholder="8-72 字符"
             @keydown.enter="submitRegister"
           />
+
+          <label class="field-label" for="register-captcha">验证码</label>
+          <div class="captcha-row">
+            <input
+              id="register-captcha"
+              v-model="captchaCode"
+              class="text-input captcha-input"
+              type="text"
+              maxlength="10"
+              inputmode="numeric"
+              autocomplete="off"
+              :disabled="busy"
+              placeholder="计算结果"
+              @keydown.enter="submitRegister"
+            />
+            <button
+              class="captcha-image-btn"
+              type="button"
+              :disabled="isCaptchaLoading"
+              title="点击刷新验证码"
+              @click="refreshCaptcha"
+            >
+              <img
+                v-if="captchaImage && !isCaptchaLoading"
+                :src="captchaImage"
+                alt="验证码"
+                class="captcha-image"
+              />
+              <span v-else class="captcha-placeholder">...</span>
+            </button>
+          </div>
 
           <div class="action-row action-row--end">
             <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitRegister">
@@ -989,6 +1109,53 @@ function handleAvatarChange(event: Event): void {
 
 .file-input {
   display: none;
+}
+
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.captcha-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.captcha-image-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 100px;
+  padding: 0;
+  border: 1px solid var(--divider-color);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.captcha-image-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+}
+
+.captcha-image-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.captcha-image {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+}
+
+.captcha-placeholder {
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .action-row {

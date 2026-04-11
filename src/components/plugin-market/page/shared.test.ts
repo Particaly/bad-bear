@@ -128,18 +128,23 @@ describe('plugin market page helpers', () => {
     })
 
     it('accepts valid login payload', () => {
-      const payload: LoginRequest = { account: 'testuser', password: 'password123' }
+      const payload: LoginRequest = { account: 'testuser', password: 'password123', captchaToken: 'token', captchaCode: '10' }
       expect(() => validateLoginPayload(payload)).not.toThrow()
     })
 
     it('rejects login payload with empty account', () => {
-      const payload: LoginRequest = { account: '  ', password: 'password123' }
+      const payload: LoginRequest = { account: '  ', password: 'password123', captchaToken: 'token', captchaCode: '10' }
       expect(() => validateLoginPayload(payload)).toThrow('请输入账号')
     })
 
     it('rejects login payload with empty password', () => {
-      const payload: LoginRequest = { account: 'testuser', password: '' }
+      const payload: LoginRequest = { account: 'testuser', password: '', captchaToken: 'token', captchaCode: '10' }
       expect(() => validateLoginPayload(payload)).toThrow('请输入密码')
+    })
+
+    it('rejects login payload with empty captchaCode', () => {
+      const payload: LoginRequest = { account: 'testuser', password: 'password123', captchaToken: 'token', captchaCode: '  ' }
+      expect(() => validateLoginPayload(payload)).toThrow('请输入验证码')
     })
 
     it('accepts valid register payload', () => {
@@ -147,6 +152,8 @@ describe('plugin market page helpers', () => {
         account: 'testuser',
         username: 'Test User',
         password: 'password123',
+        captchaToken: 'token',
+        captchaCode: '10',
       }
       expect(() => validateRegisterPayload(payload)).not.toThrow()
     })
@@ -156,8 +163,21 @@ describe('plugin market page helpers', () => {
         account: 'invalid@account',
         username: 'Test User',
         password: 'password123',
+        captchaToken: 'token',
+        captchaCode: '10',
       }
       expect(() => validateRegisterPayload(payload)).toThrow('账号需为 3-50 位字母、数字、下划线或连字符')
+    })
+
+    it('rejects register payload with empty captchaCode', () => {
+      const payload: RegisterRequest = {
+        account: 'testuser',
+        username: 'Test User',
+        password: 'password123',
+        captchaToken: 'token',
+        captchaCode: '  ',
+      }
+      expect(() => validateRegisterPayload(payload)).toThrow('请输入验证码')
     })
 
     it('accepts valid avatar file', () => {

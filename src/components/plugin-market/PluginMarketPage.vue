@@ -6,7 +6,7 @@ import {
   getInstalledPlugins,
   getRunningPlugins,
 } from '../../api/pluginMarket'
-import { useToast } from '../common/Toast'
+import { useToast, Toast as ToastComponent } from '../common/Toast'
 import type {
   CategoryInfo,
   CategoryLayoutSection,
@@ -62,6 +62,7 @@ function isInternalPlugin(_name: string): boolean {
 }
 
 const {
+  toastState,
   success: showSuccessToast,
   error: showErrorToast,
   confirm,
@@ -632,6 +633,13 @@ onUnmounted(() => {
 
 <template>
   <div class="plugin-market">
+    <ToastComponent
+      :visible="toastState.visible"
+      :message="toastState.message"
+      :type="toastState.type"
+      :duration="toastState.duration"
+      @update:visible="toastState.visible = $event"
+    />
     <aside class="side-nav card">
       <div class="side-nav-header">
         <div class="side-nav-title">邪恶的熊</div>

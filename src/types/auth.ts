@@ -12,15 +12,24 @@ export interface AuthResponse {
   user: AuthUser
 }
 
+export interface CaptchaResponse {
+  captchaToken: string
+  image: string
+}
+
 export interface LoginRequest {
   account: string
   password: string
+  captchaToken: string
+  captchaCode: string
 }
 
 export interface RegisterRequest {
   account: string
   username: string
   password: string
+  captchaToken: string
+  captchaCode: string
 }
 
 export interface CurrentUserResponse {

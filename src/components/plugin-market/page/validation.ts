@@ -49,6 +49,10 @@ export function validateRegisterPayload(payload: RegisterRequest): void {
 
   validateUsername(payload.username)
   validatePassword(payload.password)
+
+  if (!payload.captchaCode.trim()) {
+    throw new Error('请输入验证码')
+  }
 }
 
 /**
@@ -63,6 +67,10 @@ export function validateLoginPayload(payload: LoginRequest): void {
 
   if (!payload.password) {
     throw new Error('请输入密码')
+  }
+
+  if (!payload.captchaCode.trim()) {
+    throw new Error('请输入验证码')
   }
 }
 

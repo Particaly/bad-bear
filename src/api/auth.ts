@@ -1,6 +1,7 @@
 import { requestFormData, requestJson } from './httpClient'
 import type {
   AuthResponse,
+  CaptchaResponse,
   CurrentUserResponse,
   GitHubBindDevicePollResponse,
   GitHubBindingStatus,
@@ -19,6 +20,13 @@ export function register(payload: RegisterRequest): Promise<AuthResponse> {
     path: '/api/v1/auth/register',
     method: 'POST',
     body: payload,
+  })
+}
+
+export function getCaptcha(bgColor?: string): Promise<CaptchaResponse> {
+  const query = bgColor ? `?bgColor=${encodeURIComponent(bgColor)}` : ''
+  return requestJson<CaptchaResponse>({
+    path: `/api/v1/auth/captcha${query}`,
   })
 }
 

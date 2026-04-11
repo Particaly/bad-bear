@@ -33,7 +33,7 @@ defineEmits<{
       <template v-if="plugin.installed">
         <button
           v-if="canUpgrade"
-          class="btn btn-md btn-warning"
+          class="btn btn-lg btn-warning"
           :disabled="installingPlugin === plugin.name"
           @click.stop="$emit('upgrade')"
         >

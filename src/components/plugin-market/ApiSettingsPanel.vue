@@ -42,7 +42,7 @@ function submit(): void {
         />
       </div>
       <div class="action-row">
-        <button class="btn btn-md btn-primary" @click="submit">保存地址</button>
+        <button class="btn btn-lg btn-primary" @click="submit">保存地址</button>
       </div>
     </div>
   </div>

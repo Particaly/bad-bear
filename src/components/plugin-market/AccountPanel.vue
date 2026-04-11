@@ -349,12 +349,12 @@ function handleAvatarChange(event: Event): void {
           <div class="github-flow-status">{{ githubFlowStatusText }}</div>
 
           <div class="action-row github-flow-actions">
-            <button class="btn btn-md btn-primary" type="button" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
+            <button class="btn btn-lg btn-primary" type="button" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
               打开 GitHub 授权页
             </button>
             <button
               v-if="githubDeviceFlow.phase === 'error' || githubDeviceFlow.phase === 'expired'"
-              class="btn btn-md btn-ghost"
+              class="btn btn-lg btn-ghost"
               type="button"
               :disabled="busy"
               @click="githubDeviceFlow.purpose === 'bind' ? emit('github-bind') : emit('github-login')"
@@ -362,7 +362,7 @@ function handleAvatarChange(event: Event): void {
               重新发起
             </button>
             <button
-              class="btn btn-md btn-ghost"
+              class="btn btn-lg btn-ghost"
               type="button"
               @click="emit('github-cancel-device-flow')"
             >
@@ -437,7 +437,7 @@ function handleAvatarChange(event: Event): void {
             </div>
           </div>
 
-          <button class="btn btn-md profile-logout-btn" :disabled="busy" @click="emit('logout')">
+          <button class="btn btn-lg profile-logout-btn" :disabled="busy" @click="emit('logout')">
             退出登录
           </button>
         </div>
@@ -474,8 +474,8 @@ function handleAvatarChange(event: Event): void {
             />
 
             <div class="action-row action-row--end">
-              <button class="btn btn-md btn-ghost" type="button" :disabled="busy" @click="closeUsernameModal">取消</button>
-              <button class="btn btn-md btn-primary" :disabled="busy" @click="submitUsernameUpdate">
+              <button class="btn btn-lg btn-ghost" type="button" :disabled="busy" @click="closeUsernameModal">取消</button>
+              <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitUsernameUpdate">
                 {{ isUpdatingUsername ? '保存中...' : '保存用户名' }}
               </button>
             </div>
@@ -520,8 +520,8 @@ function handleAvatarChange(event: Event): void {
             />
 
             <div class="action-row action-row--end">
-              <button class="btn btn-md btn-ghost" type="button" :disabled="busy" @click="closePasswordModal">取消</button>
-              <button class="btn btn-md btn-primary" :disabled="busy" @click="submitPasswordUpdate">
+              <button class="btn btn-lg btn-ghost" type="button" :disabled="busy" @click="closePasswordModal">取消</button>
+              <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitPasswordUpdate">
                 {{ isUpdatingPassword ? '保存中...' : '保存密码' }}
               </button>
             </div>
@@ -546,8 +546,8 @@ function handleAvatarChange(event: Event): void {
             </div>
 
             <div class="action-row action-row--end">
-              <button class="btn btn-md btn-ghost" type="button" :disabled="busy" @click="closeAvatarModal">取消</button>
-              <button class="btn btn-md btn-primary" :disabled="busy" @click="triggerAvatarSelect">
+              <button class="btn btn-lg btn-ghost" type="button" :disabled="busy" @click="closeAvatarModal">取消</button>
+              <button class="btn btn-lg btn-primary" :disabled="busy" @click="triggerAvatarSelect">
                 {{ isUploadingAvatar ? '上传中...' : '选择头像文件' }}
               </button>
             </div>
@@ -606,7 +606,7 @@ function handleAvatarChange(event: Event): void {
 
           <div class="action-row action-row--end auth-login-actions">
             <button
-              class="btn btn-md btn-ghost github-login-btn"
+              class="btn btn-lg btn-ghost github-login-btn"
               type="button"
               :disabled="busy"
               @click="emit('github-login')"
@@ -621,7 +621,7 @@ function handleAvatarChange(event: Event): void {
                 {{ isGithubDeviceFlowBusy && githubDeviceFlow.purpose === 'login' ? 'GitHub 登录中...' : 'GitHub 登录' }}
               </span>
             </button>
-            <button class="btn btn-md btn-primary" :disabled="busy" @click="submitLogin">
+            <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitLogin">
               {{ isLoggingIn ? '登录中...' : '登录' }}
             </button>
           </div>
@@ -664,7 +664,7 @@ function handleAvatarChange(event: Event): void {
           />
 
           <div class="action-row action-row--end">
-            <button class="btn btn-md btn-primary" :disabled="busy" @click="submitRegister">
+            <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitRegister">
               {{ isRegistering ? '注册中...' : '注册并登录' }}
             </button>
           </div>
@@ -995,6 +995,7 @@ function handleAvatarChange(event: Event): void {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .action-row--end {

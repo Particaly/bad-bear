@@ -137,7 +137,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
           <h3 class="section-title">我的上传记录</h3>
           <div class="section-actions">
             <button
-              class="btn btn-md btn-primary"
+              class="btn btn-lg btn-primary"
               type="button"
               :disabled="!canSelectFile"
               @click="($refs.fileInput as HTMLInputElement | null)?.click()"
@@ -145,7 +145,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
               上传插件
             </button>
             <button
-              class="btn btn-md btn-ghost"
+              class="btn btn-lg btn-ghost"
               type="button"
               :disabled="uploadsLoading"
               @click="emit('refresh-uploads')"
@@ -174,7 +174,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
           <div v-if="selectedFile && !validationError" class="upload-actions">
             <button
               v-if="hashCheckResult === null"
-              class="btn btn-md btn-ghost"
+              class="btn btn-lg btn-ghost"
               type="button"
               :disabled="!canPrecheck"
               @click="emit('precheck')"
@@ -197,7 +197,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
             <div class="upload-button-row">
               <button
                 v-if="hashCheckResult?.status === 'safe'"
-                class="btn btn-md btn-primary"
+                class="btn btn-lg btn-primary"
                 type="button"
                 :disabled="!canUpload"
                 @click="emit('upload')"
@@ -205,7 +205,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
                 {{ isUploading ? '上传中...' : '确认上传' }}
               </button>
               <button
-                class="btn btn-md btn-ghost"
+                class="btn btn-lg btn-ghost"
                 type="button"
                 :disabled="isUploading"
                 @click="emit('clear-file')"
@@ -223,7 +223,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
         <div v-else-if="uploadsError" class="error-container">
           <span>{{ uploadsError }}</span>
-          <button class="btn btn-md btn-ghost" type="button" @click="emit('refresh-uploads')">重试</button>
+          <button class="btn btn-lg btn-ghost" type="button" @click="emit('refresh-uploads')">重试</button>
         </div>
 
         <div v-else-if="uploads.length === 0" class="empty-message">暂无上传记录</div>
@@ -385,6 +385,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 .upload-button-row {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .hash-check-result {

@@ -40,8 +40,8 @@
       </div>
 
       <div class="editor-footer">
-        <button class="btn" @click="emit('back')">取消</button>
-        <button class="btn" :disabled="!recordedShortcut || !targetCommand" @click="handleSave">
+        <button class="btn btn-lg" @click="emit('back')">取消</button>
+        <button class="btn btn-lg" :disabled="!recordedShortcut || !targetCommand" @click="handleSave">
           确定
         </button>
       </div>

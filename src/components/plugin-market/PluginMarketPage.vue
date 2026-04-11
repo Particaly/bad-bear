@@ -831,7 +831,7 @@ onUnmounted(() => {
                 </div>
                 <div v-else-if="loadError" class="empty-state">
                   <span>{{ loadError }}</span>
-                  <button class="btn btn-md retry-btn" @click="reloadMarket">重试</button>
+                  <button class="btn btn-lg retry-btn" @click="reloadMarket">重试</button>
                 </div>
                 <div v-else class="market-grid">
                   <PluginCard

@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="main-container">
     <PluginMarketPage class="market-page" />
   </div>
 </template>
@@ -7,10 +7,10 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import PluginMarketPage from './components/plugin-market/PluginMarketPage.vue'
-import { initializeTheme } from './config/theme'
+import { useTheme } from './config/theme'
 
 onMounted(() => {
-  void initializeTheme()
+  void useTheme()
 
   window.ztools.onPluginEnter(() => {})
   window.ztools.onPluginOut(() => {})
@@ -18,7 +18,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.container {
+.main-container {
   box-sizing: border-box;
   width: 100%;
   height: 100%;

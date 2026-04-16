@@ -20,7 +20,6 @@ export function usePluginMarketActions(options: {
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
   requireShopLogin: (actionLabel: string) => boolean
-  ensureGithubBound: (actionLabel: string) => Promise<boolean>
   confirmAction: (params: {
     title?: string
     message: string
@@ -87,10 +86,6 @@ export function usePluginMarketActions(options: {
       pluginName: string
       isInternal?: boolean
       isLoggedIn?: boolean
-      githubBound?: boolean
-      githubBindingLoading?: boolean
-      githubBindingError?: string
-      githubBindingSupported?: boolean
     },
   ): string {
     return getShareTitleForPlugin({
@@ -100,10 +95,6 @@ export function usePluginMarketActions(options: {
       isShareInProgress: isShareInProgress.value,
       installedBusyPluginName,
       isLoggedIn: shareParams.isLoggedIn,
-      githubBound: shareParams.githubBound,
-      githubBindingLoading: shareParams.githubBindingLoading,
-      githubBindingError: shareParams.githubBindingError,
-      githubBindingSupported: shareParams.githubBindingSupported,
     })
   }
 
@@ -245,7 +236,6 @@ export function usePluginMarketActions(options: {
       notifyError: options.notifyError,
       notifySuccess: options.notifySuccess,
       requireShopLogin: options.requireShopLogin,
-      ensureGithubBound: options.ensureGithubBound,
       isInternalPlugin: options.isInternalPlugin,
     })
   }

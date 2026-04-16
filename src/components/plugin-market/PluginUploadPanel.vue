@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { AuthUser } from '../../types/auth'
-import type { GitHubBindingState } from '../../types/auth'
 import type {
   MyPluginUploadRecord,
   MyPluginUploadStatus,
@@ -12,7 +11,6 @@ import { formatSize, formatDownloads } from './detail/formatters'
 
 const props = defineProps<{
   currentUser: AuthUser | null
-  githubBinding: GitHubBindingState
   selectedFile: File | null
   validationError: string
   hashCheckResult: { status: PluginHashCheckStatus; pluginName?: string; version?: string } | null
@@ -36,12 +34,11 @@ const emit = defineEmits<{
   (e: 'refresh-uploads'): void
   (e: 'delete-upload', record: MyPluginUploadRecord): void
   (e: 'open-plugin', name: string): void
+  (e: 'go-login'): void
 }>()
 
 const isLoggedIn = computed(() => !!props.currentUser)
-const isGithubBound = computed(() => props.githubBinding.bound && props.githubBinding.supported)
-const isGithubLoading = computed(() => props.githubBinding.loading && !props.githubBinding.loaded)
-const canSelectFile = computed(() => isLoggedIn.value && isGithubBound.value && !props.isUploading)
+const canSelectFile = computed(() => isLoggedIn.value && !props.isUploading)
 const canPrecheck = computed(
   () =>
     !!props.selectedFile &&
@@ -112,32 +109,28 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 <template>
   <div class="upload-panel">
-    <div class="card panel-card panel-hero">
+    <div class="panel-card panel-hero">
       <div class="panel-hero-copy">
         <h2 class="panel-title">上传插件</h2>
       </div>
     </div>
 
     <!-- Not logged in -->
-    <div v-if="!isLoggedIn" class="card panel-card section-card empty-card">
+    <div v-if="!isLoggedIn" class="panel-card section-card empty-card">
       <h3 class="section-title">登录后上传插件</h3>
-      <p class="panel-tip">请先登录账号，并绑定 GitHub 后即可上传插件。</p>
-    </div>
-
-    <!-- Logged in but GitHub not bound -->
-    <div v-else-if="!isGithubBound && !isGithubLoading" class="card panel-card section-card empty-card">
-      <h3 class="section-title">绑定 GitHub 后上传</h3>
-      <p class="panel-tip">请在上方账号区域完成 GitHub 绑定后再上传插件。</p>
+      <div class="login-cta">
+        <button class="btn btn-primary" type="button" @click="emit('go-login')">前往登录</button>
+      </div>
     </div>
 
     <!-- Upload form + history -->
     <template v-else>
-      <div class="card panel-card section-card">
+      <div class="panel-card section-card">
         <div class="section-header">
           <h3 class="section-title">我的上传记录</h3>
           <div class="section-actions">
             <button
-              class="btn btn-lg btn-primary"
+              class="btn btn-primary"
               type="button"
               :disabled="!canSelectFile"
               @click="($refs.fileInput as HTMLInputElement | null)?.click()"
@@ -145,7 +138,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
               上传插件
             </button>
             <button
-              class="btn btn-lg btn-ghost"
+              class="btn btn-ghost"
               type="button"
               :disabled="uploadsLoading"
               @click="emit('refresh-uploads')"
@@ -174,7 +167,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
           <div v-if="selectedFile && !validationError" class="upload-actions">
             <button
               v-if="hashCheckResult === null"
-              class="btn btn-lg btn-ghost"
+              class="btn btn-ghost"
               type="button"
               :disabled="!canPrecheck"
               @click="emit('precheck')"
@@ -197,7 +190,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
             <div class="upload-button-row">
               <button
                 v-if="hashCheckResult?.status === 'safe'"
-                class="btn btn-lg btn-primary"
+                class="btn btn-primary"
                 type="button"
                 :disabled="!canUpload"
                 @click="emit('upload')"
@@ -205,7 +198,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
                 {{ isUploading ? '上传中...' : '确认上传' }}
               </button>
               <button
-                class="btn btn-lg btn-ghost"
+                class="btn btn-ghost"
                 type="button"
                 :disabled="isUploading"
                 @click="emit('clear-file')"
@@ -223,7 +216,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
         <div v-else-if="uploadsError" class="error-container">
           <span>{{ uploadsError }}</span>
-          <button class="btn btn-lg btn-ghost" type="button" @click="emit('refresh-uploads')">重试</button>
+          <button class="btn btn-ghost" type="button" @click="emit('refresh-uploads')">重试</button>
         </div>
 
         <div v-else-if="uploads.length === 0" class="empty-message">暂无上传记录</div>
@@ -276,6 +269,10 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 .panel-card {
   padding: 18px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(40px) saturate(180%);
 }
 
 .panel-hero {
@@ -283,6 +280,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  height: 74px;
 }
 
 .panel-hero-copy {
@@ -317,9 +315,14 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 }
 
 .empty-card {
+  align-items: flex-start;
+}
+
+.login-cta,
+.pagination-row {
+  display: flex;
   align-items: center;
-  text-align: center;
-  padding: 32px 18px;
+  gap: 10px;
 }
 
 .section-header {
@@ -331,7 +334,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 .section-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-color);
 }
 
@@ -346,6 +349,11 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(40px) saturate(180%);
 }
 
 .hidden-input {
@@ -356,6 +364,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .file-name {
@@ -392,9 +401,12 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   font-size: 13px;
-  padding: 8px 12px;
+  padding: 12px 14px;
   border-radius: 8px;
+  border: 1px solid var(--divider-color);
+  background: var(--surface-elevated);
 }
 
 .hash-check-result.hash-safe {
@@ -415,9 +427,10 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 24px 0;
+  padding: 40px 20px;
   color: var(--text-secondary);
   font-size: 13px;
+  text-align: center;
 }
 
 .error-container {
@@ -438,8 +451,12 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 }
 
 .empty-message {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
   padding: 24px 0;
+  text-align: center;
   color: var(--text-secondary);
   font-size: 13px;
 }
@@ -447,10 +464,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 .upload-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  background: var(--divider-color);
-  border-radius: 10px;
-  overflow: hidden;
+  gap: 12px;
 }
 
 .upload-record {
@@ -458,8 +472,17 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  background: var(--bg-color);
+  padding: 16px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(40px) saturate(180%);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.upload-record:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary-color) 28%, var(--divider-color));
 }
 
 .record-main {
@@ -471,6 +494,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .record-name {
@@ -487,9 +511,10 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 .record-meta {
   display: flex;
   gap: 12px;
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--text-secondary);
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .record-filename {
@@ -508,10 +533,15 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 .status-badge {
   display: inline-flex;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -555,12 +585,12 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 .pagination-row {
   display: flex;
-  justify-content: center;
-  padding-top: 4px;
+  align-items: center;
+  gap: 10px;
 }
 
 .pagination-text {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
 }
 </style>

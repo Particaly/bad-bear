@@ -25,11 +25,13 @@ function submit(): void {
 
 <template>
   <div class="settings-panel">
-    <div class="card panel-card panel-hero">
-      <h2 class="panel-title">设置</h2>
+    <div class="panel-card panel-hero">
+      <div class="panel-hero-copy">
+        <h2 class="panel-title">设置</h2>
+      </div>
     </div>
 
-    <div class="card panel-card settings-card">
+    <div class="panel-card section-card settings-card">
       <div class="field-group">
         <label class="field-label" for="shop-api-base-url">商店后端地址</label>
         <input
@@ -42,7 +44,7 @@ function submit(): void {
         />
       </div>
       <div class="action-row">
-        <button class="btn btn-lg btn-primary" @click="submit">保存地址</button>
+        <button class="btn btn-primary" @click="submit">保存地址</button>
       </div>
     </div>
   </div>
@@ -57,12 +59,35 @@ function submit(): void {
 
 .panel-card {
   padding: 18px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(40px) saturate(180%);
+}
+
+.panel-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 74px;
+}
+
+.panel-hero-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .panel-title {
   margin: 0;
   font-size: 20px;
   color: var(--text-color);
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .settings-card {
@@ -130,6 +155,8 @@ function submit(): void {
 
 .action-row {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
 }
 </style>

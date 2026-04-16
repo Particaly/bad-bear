@@ -34,8 +34,8 @@
         </div>
 
         <div class="dialog-footer">
-          <button class="btn btn-lg btn-secondary" type="button" @click="handleCancel">{{ cancelText }}</button>
-          <button class="btn btn-lg" :class="confirmButtonClass" type="button" @click="handleConfirm">
+          <button class="btn btn-secondary" type="button" @click="handleCancel">{{ cancelText }}</button>
+          <button class="btn" :class="confirmButtonClass" type="button" @click="handleConfirm">
             {{ confirmText }}
           </button>
         </div>

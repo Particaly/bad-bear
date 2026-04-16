@@ -26,7 +26,6 @@ export function useAccountActions(options: {
   authToken: Ref<string>
   currentUser: Ref<AuthUser | null>
   selectedPluginName: Ref<string | null>
-  githubBinding: Ref<{ loading: boolean; loaded: boolean; supported: boolean; bound: boolean; errorMessage: string }>
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
   activeNav: Ref<'store' | 'installed' | 'notifications' | 'upload' | 'account' | 'settings'>
@@ -49,40 +48,6 @@ export function useAccountActions(options: {
 
     options.activeNav.value = 'account'
     options.notifyError(`请先登录后再${actionLabel}`)
-    return false
-  }
-
-  /**
-   * 检查 GitHub 是否已绑定，未绑定则导航到账户标签
-   */
-  async function ensureGithubBound(actionLabel: string): Promise<boolean> {
-    if (!options.authToken.value || !options.currentUser.value) {
-      return false
-    }
-
-    // 等待绑定状态加载完成
-    if (options.githubBinding.value.loading || !options.githubBinding.value.loaded) {
-      return false
-    }
-
-    if (options.githubBinding.value.bound) {
-      return true
-    }
-
-    options.activeNav.value = 'account'
-
-    // 检查不支持绑定的情况
-    if (!options.githubBinding.value.supported && options.githubBinding.value.errorMessage) {
-      options.notifyError(options.githubBinding.value.errorMessage)
-      return false
-    }
-
-    if (options.githubBinding.value.errorMessage) {
-      options.notifyError(options.githubBinding.value.errorMessage)
-      return false
-    }
-
-    options.notifyError(`请先绑定 GitHub 后再${actionLabel}`)
     return false
   }
 
@@ -249,7 +214,6 @@ export function useAccountActions(options: {
     isUpdatingPassword,
     isUploadingAvatar,
     requireShopLogin,
-    ensureGithubBound,
     handleLogin,
     handleRegister,
     handleUpdateUsername,

@@ -142,9 +142,9 @@ function handleVersionModalInstall(): void {
         </div>
 
         <div class="version-modal-actions">
-          <button class="btn btn-lg btn-ghost" @click="closeVersionModal">取消</button>
+          <button class="btn btn-ghost" @click="closeVersionModal">取消</button>
           <button
-            class="btn btn-lg"
+            class="btn"
             :class="installActionButtonClass"
             :disabled="installActionDisabled"
             @click="handleVersionModalInstall"

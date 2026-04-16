@@ -1,4 +1,5 @@
 const { Buffer } = require('node:buffer')
+const os = require('node:os')
 
 // 确保全局可用（某些依赖库直接读取 global.Buffer）
 if (typeof globalThis.Buffer === 'undefined') {
@@ -57,6 +58,20 @@ async function cleanupTempFile(filePath) {
 
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
+  getSystemInfo() {
+    const platform = os.platform()
+    return {
+      platform: platform === 'win32' ? 'win32' : platform === 'darwin' ? 'darwin' : 'linux',
+    }
+  },
+
+  getThemeInfo() {
+    return window.ztools.getThemeInfo()
+  },
+
+  onThemeChange(callback) {
+    window.ztools.onThemeChange(callback)
+  },
   // ===== 文件系统能力 =====
 
   /**
@@ -241,3 +256,6 @@ window.services = {
     }
   },
 }
+
+
+window.ztools.setExpendHeight(600)

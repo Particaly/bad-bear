@@ -53,7 +53,6 @@ export function usePluginMarketRuntime(options: {
     authToken: runtimeConfig.authToken,
     currentUser: runtimeConfig.currentUser,
     selectedPluginName: options.selectedPluginName,
-    githubBinding: githubFlow.githubBinding,
     notifyError: options.notifyError,
     notifySuccess: options.notifySuccess,
     activeNav: options.activeNav,

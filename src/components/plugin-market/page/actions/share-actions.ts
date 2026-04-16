@@ -47,10 +47,6 @@ export function getShareTitleForPlugin(params: {
   isShareInProgress: boolean
   installedBusyPluginName: Ref<string | null>
   isLoggedIn?: boolean
-  githubBound?: boolean
-  githubBindingLoading?: boolean
-  githubBindingError?: string
-  githubBindingSupported?: boolean
 }): string {
   const {
     pluginName,
@@ -59,10 +55,6 @@ export function getShareTitleForPlugin(params: {
     isShareInProgress,
     installedBusyPluginName,
     isLoggedIn,
-    githubBound,
-    githubBindingLoading,
-    githubBindingError,
-    githubBindingSupported,
   } = params
 
   // 内置插件不可分享
@@ -73,20 +65,6 @@ export function getShareTitleForPlugin(params: {
   // 未登录
   if (isLoggedIn === false) {
     return '请先登录后再分享插件'
-  }
-
-  // 正在检查绑定状态
-  if (githubBindingLoading) {
-    return '正在检查 GitHub 绑定状态...'
-  }
-
-  // 未绑定 GitHub
-  if (githubBound === false) {
-    if (githubBindingSupported === false && githubBindingError) {
-      return githubBindingError
-    }
-
-    return githubBindingError || '请先绑定 GitHub 后再分享插件'
   }
 
   // 正在分享其他插件
@@ -106,7 +84,7 @@ export function getShareTitleForPlugin(params: {
 
 /**
  * 处理插件分享操作：打包、上传、清理
- * 需要登录和绑定 GitHub
+ * 需要登录
  */
 export async function handleSharePlugin(
   plugin: PluginMarketUiPlugin,
@@ -117,7 +95,6 @@ export async function handleSharePlugin(
     notifyError: (message: string) => void
     notifySuccess: (message: string) => void
     requireShopLogin: (actionLabel: string) => boolean
-    ensureGithubBound: (actionLabel: string) => Promise<boolean>
     isInternalPlugin: (name: string) => boolean
   },
 ): Promise<void> {
@@ -134,11 +111,6 @@ export async function handleSharePlugin(
 
   // 检查登录状态
   if (!params.requireShopLogin('分享插件')) {
-    return
-  }
-
-  // 检查 GitHub 绑定状态
-  if (!(await params.ensureGithubBound('分享插件'))) {
     return
   }
 

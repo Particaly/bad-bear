@@ -40,6 +40,13 @@ import { usePluginMarketRuntime } from './page/usePluginMarketRuntime'
 import { useStoreSubInput } from './page/useStoreSubInput'
 import { buildMarketViewState } from './page/storefront'
 
+interface SideNavItem {
+  key: ActiveNav
+  label: string
+  badge?: string | number
+  visible?: boolean
+}
+
 const activeNav = ref<ActiveNav>('store')
 const isLoading = ref(true)
 const loadError = ref('')
@@ -231,7 +238,6 @@ const {
   currentUserAvatarUrl,
   refreshCurrentUser,
   requireShopLogin,
-  ensureGithubBound,
   handleLogin,
   handleRegister,
   handleGithubLogin,
@@ -303,7 +309,6 @@ const actions = usePluginMarketActions({
   notifyError,
   notifySuccess,
   requireShopLogin,
-  ensureGithubBound,
   confirmAction,
   reloadMarket: () => reloadMarket(),
   openPluginByName,
@@ -401,6 +406,10 @@ function handleUploadOpenPlugin(name: string): void {
   selectedPluginName.value = name
 }
 
+function handleGoToUploadLogin(): void {
+  activeNav.value = 'account'
+}
+
 // Navigation composable
 const {
   handleNavClick: navClick,
@@ -456,7 +465,7 @@ function openPlugin(plugin: PluginMarketUiPlugin) {
 
 const notificationBadgeText = computed(() => {
   if (!currentUser.value) {
-    return '登录'
+    return undefined
   }
 
   if (unreadNotificationTotal.value > 99) {
@@ -466,16 +475,44 @@ const notificationBadgeText = computed(() => {
   return String(unreadNotificationTotal.value)
 })
 
+const sideNavItems = computed<SideNavItem[]>(() => [
+  {
+    key: 'store',
+    label: '商店',
+    badge: plugins.value.length,
+  },
+  {
+    key: 'installed',
+    label: '已安装',
+    badge: installedViewPlugins.value.length,
+    visible: canUseInternalPluginApis.value,
+  },
+  {
+    key: 'notifications',
+    label: '通知',
+    badge: notificationBadgeText.value,
+  },
+  {
+    key: 'upload',
+    label: '上传',
+  },
+  {
+    key: 'account',
+    label: '账户',
+    badge: currentUser.value ? currentUser.value.username : '未登录',
+  },
+  {
+    key: 'settings',
+    label: '设置',
+  },
+].filter((item) => item.visible !== false))
+
 function isShareUnavailableForPlugin(pluginName: string): boolean {
   if (isShareDisabledForPlugin(pluginName)) {
     return true
   }
 
-  if (!currentUser.value) {
-    return true
-  }
-
-  return !githubBinding.value.bound
+  return !currentUser.value
 }
 
 function getShareTitleForPlugin(pluginName: string): string {
@@ -483,10 +520,6 @@ function getShareTitleForPlugin(pluginName: string): string {
     pluginName,
     isInternal: isInternalPlugin(pluginName),
     isLoggedIn: !!currentUser.value,
-    githubBound: githubBinding.value.bound,
-    githubBindingLoading: githubBinding.value.loading,
-    githubBindingError: githubBinding.value.errorMessage,
-    githubBindingSupported: githubBinding.value.supported,
   })
 }
 
@@ -640,59 +673,24 @@ onUnmounted(() => {
       :duration="toastState.duration"
       @update:visible="toastState.visible = $event"
     />
-    <aside class="side-nav card">
+    <aside class="side-nav">
       <div class="side-nav-header">
         <div class="side-nav-title">邪恶的熊</div>
         <div class="side-nav-subtitle">你需要有独当一面的能力<br>才能避免引火烧身</div>
       </div>
 
-      <button
-        class="side-nav-item"
-        :class="{ active: activeNav === 'store' }"
-        @click="handleNavClick('store')"
-      >
-        <span class="side-nav-item-label">商店</span>
-        <span class="side-nav-count">{{ plugins.length }}</span>
-      </button>
-      <button
-        v-if="canUseInternalPluginApis"
-        class="side-nav-item"
-        :class="{ active: activeNav === 'installed' }"
-        @click="handleNavClick('installed')"
-      >
-        <span class="side-nav-item-label">已安装</span>
-        <span class="side-nav-count">{{ installedViewPlugins.length }}</span>
-      </button>
-      <button
-        class="side-nav-item"
-        :class="{ active: activeNav === 'notifications' }"
-        @click="handleNavClick('notifications')"
-      >
-        <span class="side-nav-item-label">通知</span>
-        <span class="side-nav-count">{{ notificationBadgeText }}</span>
-      </button>
-      <button
-        class="side-nav-item"
-        :class="{ active: activeNav === 'upload' }"
-        @click="handleNavClick('upload')"
-      >
-        <span class="side-nav-item-label">上传</span>
-      </button>
-      <button
-        class="side-nav-item"
-        :class="{ active: activeNav === 'account' }"
-        @click="handleNavClick('account')"
-      >
-        <span class="side-nav-item-label">账户</span>
-        <span class="side-nav-count">{{ currentUser ? currentUser.username : '未登录' }}</span>
-      </button>
-      <button
-        class="side-nav-item"
-        :class="{ active: activeNav === 'settings' }"
-        @click="handleNavClick('settings')"
-      >
-        <span class="side-nav-item-label">设置</span>
-      </button>
+      <div class="side-nav-list">
+        <div
+          v-for="item in sideNavItems"
+          :key="item.key"
+          class="side-nav-item"
+          :class="{ active: activeNav === item.key }"
+          @click="handleNavClick(item.key)"
+        >
+          <span class="side-nav-item-label">{{ item.label }}</span>
+          <span v-if="item.badge !== undefined" class="side-nav-count">{{ item.badge }}</span>
+        </div>
+      </div>
 
       <div class="side-nav-footer">
         <div v-if="currentUser" class="side-nav-user">
@@ -705,7 +703,6 @@ onUnmounted(() => {
             <div class="side-nav-user-account">{{ currentUser.account }}</div>
           </div>
         </div>
-        <div v-else class="side-nav-guest">更多功能登录后可用</div>
       </div>
     </aside>
 
@@ -839,7 +836,7 @@ onUnmounted(() => {
                 </div>
                 <div v-else-if="loadError" class="empty-state">
                   <span>{{ loadError }}</span>
-                  <button class="btn btn-lg retry-btn" @click="reloadMarket">重试</button>
+                  <button class="btn retry-btn" @click="reloadMarket">重试</button>
                 </div>
                 <div v-else class="market-grid">
                   <PluginCard
@@ -922,7 +919,6 @@ onUnmounted(() => {
         <div v-else-if="activeNav === 'upload'" class="panel-view scrollable-panel">
           <PluginUploadPanel
             :current-user="currentUser"
-            :github-binding="githubBinding"
             :selected-file="uploadSelectedFile"
             :validation-error="uploadValidationError"
             :hash-check-result="uploadHashCheckResult"
@@ -943,6 +939,7 @@ onUnmounted(() => {
             @refresh-uploads="uploadLoadRecords"
             @delete-upload="uploadHandleDelete"
             @open-plugin="handleUploadOpenPlugin"
+            @go-login="handleGoToUploadLogin"
           />
         </div>
 
@@ -1055,22 +1052,14 @@ onUnmounted(() => {
   display: flex;
   height: 100%;
   min-height: 0;
-  background: var(--bg-color);
 }
 
 .side-nav {
-  width: 220px;
-  min-width: 220px;
+  width: 200px;
+  border-right: 1px solid var(--divider-color);
+  padding: 12px 8px;
+  overflow-y: auto;
   height: 100%;
-  padding: 18px 14px;
-  border-radius: 0;
-  border-top: none;
-  border-bottom: none;
-  border-left: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--surface-color);
 }
 
 .side-nav-header {
@@ -1090,32 +1079,41 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.side-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px;
+  overflow-y: auto;
+}
+
 .side-nav-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 12px 12px;
-  border-radius: 12px;
-  color: var(--text-secondary);
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--text-color);
   text-align: left;
+  transition: all 0.2s;
 }
 
 .side-nav-item:hover {
   background: var(--hover-bg);
-  color: var(--text-color);
 }
 
 .side-nav-item.active {
-  background: var(--primary-color);
-  color: var(--text-on-primary);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary-color) 24%, transparent);
+  background: var(--active-bg);
+  color: var(--primary-color);
+  font-weight: 500;
 }
 
 .side-nav-item-label {
+  min-width: 0;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: inherit;
 }
 
 .side-nav-count {
@@ -1127,7 +1125,7 @@ onUnmounted(() => {
   height: 24px;
   padding: 0 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, currentColor 16%, transparent);
+  background: color-mix(in srgb, currentColor 14%, transparent);
   font-size: 11px;
   font-weight: 700;
   overflow: hidden;

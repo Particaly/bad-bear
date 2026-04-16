@@ -158,7 +158,7 @@ watch(
       </div>
 
       <button
-        class="btn btn-lg btn-ghost rating-trigger-btn"
+        class="btn btn-ghost rating-trigger-btn"
         :disabled="ratingSubmitting"
         @click="openRatingModal"
       >
@@ -207,9 +207,9 @@ watch(
             <div class="comment-editor-footer">
               <span class="comment-counter">{{ replyDraftLength }}/1000</span>
               <div class="reply-actions">
-                <button class="btn btn-lg btn-ghost" :disabled="commentSubmitting" @click="cancelReply">取消</button>
+                <button class="btn btn-ghost" :disabled="commentSubmitting" @click="cancelReply">取消</button>
                 <button
-                  class="btn btn-lg comment-submit-btn"
+                  class="btn comment-submit-btn"
                   :disabled="commentSubmitting || !replyDraft.trim()"
                   @click="handleSubmitReply(comment.id)"
                 >
@@ -240,7 +240,7 @@ watch(
       </div>
 
       <div v-if="hasMoreComments && !commentsLoading" class="load-more-wrap">
-        <button class="btn btn-lg btn-ghost" :disabled="commentsLoadingMore" @click="emit('load-more-comments')">
+        <button class="btn btn-ghost" :disabled="commentsLoadingMore" @click="emit('load-more-comments')">
           <span v-if="commentsLoadingMore">加载中...</span>
           <span v-else>加载更多</span>
         </button>
@@ -273,8 +273,8 @@ watch(
         <div class="selected-rating-text">当前：{{ selectedRating }} 星</div>
 
         <div class="rating-modal-actions">
-          <button class="btn btn-lg btn-ghost" :disabled="ratingSubmitting" @click="closeRatingModal">取消</button>
-          <button class="btn btn-lg btn-primary rating-submit-btn" :disabled="ratingSubmitting" @click="handleSubmitRating">
+          <button class="btn btn-ghost" :disabled="ratingSubmitting" @click="closeRatingModal">取消</button>
+          <button class="btn btn-primary rating-submit-btn" :disabled="ratingSubmitting" @click="handleSubmitRating">
             <span v-if="ratingSubmitting">提交中...</span>
             <span v-else>{{ currentUserRatingValue ? '更新评分' : '提交评分' }}</span>
           </button>
@@ -304,7 +304,7 @@ watch(
 
       <div class="comment-editor-footer">
         <span class="comment-counter">{{ commentDraftLength }}/1000</span>
-        <button class="btn btn-lg comment-submit-btn" :disabled="commentSubmitting || !commentDraft.trim()" @click="handleSubmitComment">
+        <button class="btn comment-submit-btn" :disabled="commentSubmitting || !commentDraft.trim()" @click="handleSubmitComment">
           <span v-if="commentSubmitting">提交中...</span>
           <span v-else>发表评论</span>
         </button>

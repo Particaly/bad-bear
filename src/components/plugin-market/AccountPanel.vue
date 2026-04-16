@@ -8,7 +8,6 @@ import type {
   RegisterRequest,
   UpdateUsernameRequest,
 } from '../../types/auth'
-import { reloadTheme } from '../../config/theme'
 import { getCaptcha } from '../../api/auth'
 
 const props = withDefaults(
@@ -239,15 +238,6 @@ watch(
   },
 )
 
-watch(
-  () => props.currentUser,
-  (user) => {
-    if (user) {
-      void reloadTheme()
-    }
-  },
-)
-
 async function refreshCaptcha(): Promise<void> {
   isCaptchaLoading.value = true
   try {
@@ -382,28 +372,28 @@ function handleAvatarChange(event: Event): void {
 
 <template>
   <div class="account-panel">
-    <div class="card panel-card panel-hero">
+    <div class="panel-card panel-hero">
       <div class="panel-hero-copy">
         <h2 class="panel-title">账号与资料</h2>
       </div>
       <div v-if="!currentUser" class="auth-tabs" :style="{ '--auth-slider-index': authMode === 'login' ? '0' : '1' }">
         <div class="auth-tab-slider" aria-hidden="true"></div>
-        <button
+        <div
           class="auth-tab"
           :class="{ active: authMode === 'login' }"
           :disabled="busy"
           @click="authMode = 'login'"
         >
           登录
-        </button>
-        <button
+        </div>
+        <div
           class="auth-tab"
           :class="{ active: authMode === 'register' }"
           :disabled="busy"
           @click="authMode = 'register'"
         >
           注册
-        </button>
+        </div>
       </div>
     </div>
 
@@ -427,12 +417,12 @@ function handleAvatarChange(event: Event): void {
           <div class="github-flow-status">{{ githubFlowStatusText }}</div>
 
           <div class="action-row github-flow-actions">
-            <button class="btn btn-lg btn-primary" type="button" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
+            <button class="btn btn-primary" type="button" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
               打开 GitHub 授权页
             </button>
             <button
               v-if="githubDeviceFlow.phase === 'error' || githubDeviceFlow.phase === 'expired'"
-              class="btn btn-lg btn-ghost"
+              class="btn btn-ghost"
               type="button"
               :disabled="busy"
               @click="githubDeviceFlow.purpose === 'bind' ? emit('github-bind') : emit('github-login')"
@@ -440,7 +430,7 @@ function handleAvatarChange(event: Event): void {
               重新发起
             </button>
             <button
-              class="btn btn-lg btn-ghost"
+              class="btn btn-ghost"
               type="button"
               @click="emit('github-cancel-device-flow')"
             >
@@ -452,7 +442,7 @@ function handleAvatarChange(event: Event): void {
     </Teleport>
 
     <template v-if="currentUser">
-      <div class="card panel-card profile-card">
+      <div class="panel-card profile-card">
         <div class="profile-header">
           <div class="profile-identity-row">
             <button class="profile-avatar-wrap" type="button" :disabled="busy" @click="openAvatarModal">
@@ -515,7 +505,7 @@ function handleAvatarChange(event: Event): void {
             </div>
           </div>
 
-          <button class="btn btn-lg profile-logout-btn" :disabled="busy" @click="emit('logout')">
+          <button class="btn profile-logout-btn" :disabled="busy" @click="emit('logout')">
             退出登录
           </button>
         </div>
@@ -552,8 +542,8 @@ function handleAvatarChange(event: Event): void {
             />
 
             <div class="action-row action-row--end">
-              <button class="btn btn-lg btn-ghost" type="button" :disabled="busy" @click="closeUsernameModal">取消</button>
-              <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitUsernameUpdate">
+              <button class="btn btn-ghost" type="button" :disabled="busy" @click="closeUsernameModal">取消</button>
+              <button class="btn btn-primary" :disabled="busy" @click="submitUsernameUpdate">
                 {{ isUpdatingUsername ? '保存中...' : '保存用户名' }}
               </button>
             </div>
@@ -598,8 +588,8 @@ function handleAvatarChange(event: Event): void {
             />
 
             <div class="action-row action-row--end">
-              <button class="btn btn-lg btn-ghost" type="button" :disabled="busy" @click="closePasswordModal">取消</button>
-              <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitPasswordUpdate">
+              <button class="btn btn-ghost" type="button" :disabled="busy" @click="closePasswordModal">取消</button>
+              <button class="btn btn-primary" :disabled="busy" @click="submitPasswordUpdate">
                 {{ isUpdatingPassword ? '保存中...' : '保存密码' }}
               </button>
             </div>
@@ -624,8 +614,8 @@ function handleAvatarChange(event: Event): void {
             </div>
 
             <div class="action-row action-row--end">
-              <button class="btn btn-lg btn-ghost" type="button" :disabled="busy" @click="closeAvatarModal">取消</button>
-              <button class="btn btn-lg btn-primary" :disabled="busy" @click="triggerAvatarSelect">
+              <button class="btn btn-ghost" type="button" :disabled="busy" @click="closeAvatarModal">取消</button>
+              <button class="btn btn-primary" :disabled="busy" @click="triggerAvatarSelect">
                 {{ isUploadingAvatar ? '上传中...' : '选择头像文件' }}
               </button>
             </div>
@@ -635,7 +625,7 @@ function handleAvatarChange(event: Event): void {
     </template>
 
     <template v-else>
-      <div class="card panel-card auth-card">
+      <div class="panel-card auth-card">
         <div v-if="isRestoringSession" class="auth-status">正在恢复登录状态...</div>
 
         <template v-if="authMode === 'login'">
@@ -695,7 +685,7 @@ function handleAvatarChange(event: Event): void {
 
           <div class="action-row action-row--end auth-login-actions">
             <button
-              class="btn btn-lg btn-ghost github-login-btn"
+              class="btn btn-ghost github-login-btn"
               type="button"
               :disabled="busy"
               @click="emit('github-login')"
@@ -710,7 +700,7 @@ function handleAvatarChange(event: Event): void {
                 {{ isGithubDeviceFlowBusy && githubDeviceFlow.purpose === 'login' ? 'GitHub 登录中...' : 'GitHub 登录' }}
               </span>
             </button>
-            <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitLogin">
+            <button class="btn btn-primary" :disabled="busy" @click="submitLogin">
               {{ isLoggingIn ? '登录中...' : '登录' }}
             </button>
           </div>
@@ -784,7 +774,7 @@ function handleAvatarChange(event: Event): void {
           </div>
 
           <div class="action-row action-row--end">
-            <button class="btn btn-lg btn-primary" :disabled="busy" @click="submitRegister">
+            <button class="btn btn-primary" :disabled="busy" @click="submitRegister">
               {{ isRegistering ? '注册中...' : '注册并登录' }}
             </button>
           </div>
@@ -803,6 +793,10 @@ function handleAvatarChange(event: Event): void {
 
 .panel-card {
   padding: 18px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(40px) saturate(180%);
 }
 
 .panel-hero {
@@ -810,6 +804,12 @@ function handleAvatarChange(event: Event): void {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  height: 74px;
+}
+
+.panel-hero-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .panel-eyebrow {
@@ -1043,6 +1043,7 @@ function handleAvatarChange(event: Event): void {
   grid-template-columns: repeat(2, minmax(72px, 1fr));
   width: fit-content;
   padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--primary-color, #3b82f6) 14%, var(--divider-color));
   border-radius: 999px;
   background: var(--surface-elevated);
   isolation: isolate;
@@ -1067,13 +1068,18 @@ function handleAvatarChange(event: Event): void {
 .auth-tab {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 72px;
   padding: 8px 14px;
   border-radius: 999px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 700;
+  text-align: center;
   transition: color 0.2s ease;
+  cursor: default;
 }
 
 .auth-tab.active {

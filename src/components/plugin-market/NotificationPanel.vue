@@ -91,17 +91,17 @@ function closeDetail(): void {
 
 <template>
   <div class="notification-panel">
-    <div class="card panel-card panel-hero">
+    <div class="panel-card panel-hero ">
       <div class="panel-hero-copy">
         <h2 class="panel-title">通知中心</h2>
       </div>
 
       <div class="hero-actions">
-        <button class="btn btn-lg btn-ghost" type="button" :disabled="loading" @click="emit('refresh')">
+        <button class="btn  btn-ghost" type="button" :disabled="loading" @click="emit('refresh')">
           刷新
         </button>
         <button
-          class="btn btn-lg btn-primary"
+          class="btn btn-md btn-primary"
           type="button"
           :disabled="!canMarkAllRead"
           @click="emit('mark-all-read')"
@@ -112,17 +112,16 @@ function closeDetail(): void {
     </div>
 
     <template v-if="!currentUser">
-      <div class="card panel-card section-card empty-card">
+      <div class="panel-card section-card empty-card">
         <h3 class="section-title">登录后查看通知</h3>
-        <p class="panel-tip">未登录时不会请求通知列表。登录后可查看回复、互动提醒和系统消息。</p>
         <div class="login-cta">
-          <button class="btn btn-lg btn-primary" type="button" @click="emit('go-login')">前往登录</button>
+          <button class="btn btn-primary" type="button" @click="emit('go-login')">前往登录</button>
         </div>
       </div>
     </template>
 
     <template v-else>
-      <div class="card panel-card section-card">
+      <div class="panel-card section-card">
         <div class="notification-toolbar">
           <div class="filter-tabs" role="tablist" aria-label="通知筛选">
             <button
@@ -146,7 +145,7 @@ function closeDetail(): void {
 
         <div v-else-if="error" class="error-container">
           <span>{{ error }}</span>
-          <button class="btn btn-lg btn-ghost" type="button" @click="emit('refresh')">重试</button>
+          <button class="btn btn-ghost" type="button" @click="emit('refresh')">重试</button>
         </div>
 
         <div v-else-if="items.length === 0" class="empty-message">{{ emptyStateText }}</div>
@@ -245,11 +244,11 @@ function closeDetail(): void {
         </Teleport>
 
         <div v-if="shouldShowPagination" class="pagination-row">
-          <button class="btn btn-lg btn-ghost" type="button" :disabled="!canGoPrev" @click="emit('change-page', page - 1)">
+          <button class="btn btn-ghost" type="button" :disabled="!canGoPrev" @click="emit('change-page', page - 1)">
             上一页
           </button>
           <span class="pagination-text">共 {{ total }} 条，当前第 {{ page }} / {{ totalPages }} 页</span>
-          <button class="btn btn-lg btn-ghost" type="button" :disabled="!canGoNext" @click="emit('change-page', page + 1)">
+          <button class="btn btn-ghost" type="button" :disabled="!canGoNext" @click="emit('change-page', page + 1)">
             下一页
           </button>
         </div>
@@ -330,7 +329,7 @@ function closeDetail(): void {
 
 .panel-hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
@@ -399,14 +398,16 @@ function closeDetail(): void {
   color: var(--text-color);
 }
 
+.panel-card,
 .section-card,
 .summary-card,
 .notification-card,
 .reply-card,
 .notification-detail {
   border: 1px solid var(--divider-color);
-  border-radius: 16px;
-  background: var(--surface-color, var(--card-bg));
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(40px) saturate(180%);
 }
 
 .section-card {

@@ -21,7 +21,21 @@ declare module '*.vue' {
   export default component
 }
 
+interface SystemInfo {
+  platform: 'win32' | 'darwin' | 'linux'
+}
+
+interface ThemeInfo {
+  isDark: boolean
+  primaryColor?: string
+  customColor?: string
+  windowMaterial: string
+}
+
 interface Services {
+  getSystemInfo(): SystemInfo
+  getThemeInfo(): ThemeInfo
+  onThemeChange(callback: (theme: ThemeInfo) => void): void
   readFile: (filePath: string, encoding?: string) => string
   readBinaryFile: (filePath: string) => Uint8Array
   writeFile: (filePath: string, content: string) => void

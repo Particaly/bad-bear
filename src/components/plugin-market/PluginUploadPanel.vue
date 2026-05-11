@@ -151,7 +151,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
         <input
           ref="fileInput"
           type="file"
-          accept=".zpx"
+          accept=".zpx,.zip"
           class="hidden-input"
           @change="handleFileInput"
         />

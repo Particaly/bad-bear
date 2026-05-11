@@ -32,6 +32,8 @@ export {
   buildPluginHashOptions,
   resolveSelectedVersion,
   resolveSelectedHash,
+  parsePluginSourceReference,
+  mapPluginSourceLabel,
   buildResolvedPluginDownloadTarget,
 } from './plugin-detail'
 

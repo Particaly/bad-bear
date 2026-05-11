@@ -267,6 +267,24 @@ export interface CategoryInfo {
   plugins: PluginMarketUiPlugin[]
 }
 
+export type PluginReleaseSource = string | Record<string, unknown> | null
+
+export interface PublicProviderRecord {
+  id: string
+  name?: string
+  title?: string
+  label?: string
+  publicName?: string
+  [key: string]: unknown
+}
+
+export interface PluginDetailReadme {
+  hash?: string | null
+  content?: string | null
+  source?: PluginReleaseSource
+  isAiGenerated?: boolean
+}
+
 export interface PluginDetailVersion {
   id: string
   version: string
@@ -274,6 +292,10 @@ export interface PluginDetailVersion {
   fileSize: number
   downloads: number
   createdAt: string
+  source?: PluginReleaseSource
+  uploaderUserId?: string | null
+  uploaderAccount?: string | null
+  uploaderUsername?: string | null
 }
 
 export interface PluginVersionOption {
@@ -289,6 +311,10 @@ export interface PluginHashOption {
   fileSize: number
   downloads: number
   createdAt: string
+  source?: PluginReleaseSource
+  uploaderUserId?: string | null
+  uploaderAccount?: string | null
+  uploaderUsername?: string | null
 }
 
 export interface ResolvedPluginDownloadTarget {
@@ -303,14 +329,49 @@ export interface ResolvedPluginDownloadTarget {
 export interface PluginDetailResponse {
   id: string
   name: string
+  title?: string
+  description?: string
+  author?: string
+  logo?: string
+  features?: PluginFeature[]
+  version?: string
+  main?: string
+  preload?: string
   categories: string[]
   categoryFallback: boolean
   avgRating: number
   ratingCount: number
   totalDownloads: number
+  source?: PluginReleaseSource
+  readme?: PluginDetailReadme | null
   versions: PluginDetailVersion[]
   createdAt: string
   updatedAt: string
+}
+
+export interface PluginRiskSummary {
+  level?: string | null
+  summary?: string | null
+  filePath?: string | null
+  reasons?: string[]
+}
+
+export interface PluginRiskInfo {
+  pluginName: string
+  version: string
+  riskLevel: string
+  riskSummary: PluginRiskSummary | null
+  reviewDecision?: string | null
+  updatedAt: string
+}
+
+export interface PluginVersionBuildsResponse {
+  items: PluginDetailVersion[]
+}
+
+export interface PluginStatsResponse {
+  totalDownloads?: number
+  [key: string]: unknown
 }
 
 export interface PluginPageQuery {

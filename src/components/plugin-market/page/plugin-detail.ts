@@ -6,7 +6,9 @@ import type {
   PluginHashOption,
   PluginMarketPlugin,
   PluginMarketUiPlugin,
+  PluginReleaseSource,
   PluginVersionOption,
+  PublicProviderRecord,
   ResolvedPluginDownloadTarget,
 } from '../../../types/pluginMarket'
 import { resolvePluginInstallPayload } from '../../../api/pluginMarket'
@@ -25,13 +27,21 @@ export function mergePluginDetailIntoPlugin(
   }
 
   const latestBuild = detail?.versions?.[0] || null
-  const resolvedVersion = resolvedDownloadTarget?.version || plugin.version
+  const resolvedBuild = resolvedDownloadTarget?.build || latestBuild
+  const resolvedVersion = resolvedDownloadTarget?.version || detail?.version || plugin.version
 
   return {
     ...plugin,
+    title: detail?.title ?? plugin.title,
+    description: detail?.description ?? plugin.description,
+    author: detail?.author ?? plugin.author,
+    logo: detail?.logo ?? plugin.logo,
+    features: detail?.features ?? plugin.features,
+    main: detail?.main ?? plugin.main,
+    preload: detail?.preload ?? plugin.preload,
     version: resolvedVersion,
     downloadUrl: resolvedDownloadTarget?.downloadUrl || plugin.downloadUrl,
-    size: typeof plugin.size === 'number' ? plugin.size : latestBuild?.fileSize,
+    size: resolvedBuild?.fileSize ?? plugin.size ?? latestBuild?.fileSize,
     totalDownloads: detail?.totalDownloads ?? plugin.totalDownloads,
     avgRating: detail?.avgRating ?? plugin.avgRating,
     ratingCount: detail?.ratingCount ?? plugin.ratingCount,
@@ -95,6 +105,10 @@ export function buildPluginHashOptions(
       fileSize: item.fileSize,
       downloads: item.downloads,
       createdAt: item.createdAt,
+      source: item.source,
+      uploaderUserId: item.uploaderUserId,
+      uploaderAccount: item.uploaderAccount,
+      uploaderUsername: item.uploaderUsername,
     }))
 }
 
@@ -140,6 +154,83 @@ export function resolveSelectedHash(
  * - 'version': 使用特定版本（该版本的最新构建）
  * - 'hash': 使用特定构建哈希
  */
+export interface PluginSourceReference {
+  kind: 'provider-sync' | 'user-upload' | 'unknown'
+  providerId?: string | null
+}
+
+export function parsePluginSourceReference(
+  source: PluginReleaseSource | undefined,
+): PluginSourceReference | null {
+  if (!source) {
+    return null
+  }
+
+  if (typeof source === 'string') {
+    const normalized = source.trim().toLowerCase()
+    if (!normalized) {
+      return null
+    }
+    if (normalized.includes('provider')) {
+      return { kind: 'provider-sync' }
+    }
+    if (normalized.includes('upload') || normalized.includes('manual') || normalized.includes('user')) {
+      return { kind: 'user-upload' }
+    }
+    return { kind: 'unknown' }
+  }
+
+  const providerId =
+    typeof source.providerId === 'string'
+      ? source.providerId
+      : typeof source.provider_id === 'string'
+        ? source.provider_id
+        : null
+  const typeCandidate =
+    typeof source.type === 'string'
+      ? source.type
+      : typeof source.kind === 'string'
+        ? source.kind
+        : typeof source.sourceType === 'string'
+          ? source.sourceType
+          : ''
+  const normalizedType = typeCandidate.trim().toLowerCase()
+
+  if (providerId || normalizedType.includes('provider')) {
+    return { kind: 'provider-sync', providerId }
+  }
+  if (
+    normalizedType.includes('upload') ||
+    normalizedType.includes('manual') ||
+    normalizedType.includes('user')
+  ) {
+    return { kind: 'user-upload' }
+  }
+
+  return { kind: 'unknown' }
+}
+
+export function mapPluginSourceLabel(
+  reference: PluginSourceReference | null,
+  provider?: PublicProviderRecord | null,
+): string {
+  if (!reference) {
+    return ''
+  }
+
+  if (reference.kind === 'provider-sync') {
+    const providerName =
+      provider?.publicName || provider?.title || provider?.label || provider?.name || ''
+    return providerName ? `来源同步 · ${providerName}` : '来源同步'
+  }
+
+  if (reference.kind === 'user-upload') {
+    return '用户上传'
+  }
+
+  return '未知来源'
+}
+
 export function buildResolvedPluginDownloadTarget(
   plugin: PluginMarketUiPlugin | null,
   detail: PluginDetailResponse | null,

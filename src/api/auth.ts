@@ -38,6 +38,24 @@ export function login(payload: LoginRequest): Promise<AuthResponse> {
   })
 }
 
+export function buildGithubWebLoginUrl(params: {
+  redirect?: string
+  frontendOrigin?: string
+} = {}): string {
+  const searchParams = new URLSearchParams()
+
+  if (params.redirect?.trim()) {
+    searchParams.set('redirect', params.redirect.trim())
+  }
+
+  if (params.frontendOrigin?.trim()) {
+    searchParams.set('frontendOrigin', params.frontendOrigin.trim())
+  }
+
+  const query = searchParams.toString()
+  return `/api/v1/auth/github/web/start${query ? `?${query}` : ''}`
+}
+
 export function startGithubDeviceLogin(): Promise<GitHubDeviceStartResponse> {
   return requestJson<GitHubDeviceStartResponse>({
     path: '/api/v1/auth/github/device/start',

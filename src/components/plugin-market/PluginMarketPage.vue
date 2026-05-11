@@ -284,6 +284,8 @@ const {
   pluginCommentSubmitSuccessKey,
   pluginCommentTree,
   hasMorePluginComments,
+  selectedSourceLabel,
+  selectedBuildSourceLabel,
   pluginVersionOptions,
   selectedVersionHashOptions,
   selectedPluginBuild,
@@ -475,37 +477,41 @@ const notificationBadgeText = computed(() => {
   return String(unreadNotificationTotal.value)
 })
 
-const sideNavItems = computed<SideNavItem[]>(() => [
-  {
-    key: 'store',
-    label: '商店',
-    badge: plugins.value.length,
-  },
-  {
-    key: 'installed',
-    label: '已安装',
-    badge: installedViewPlugins.value.length,
-    visible: canUseInternalPluginApis.value,
-  },
-  {
-    key: 'notifications',
-    label: '通知',
-    badge: notificationBadgeText.value,
-  },
-  {
-    key: 'upload',
-    label: '上传',
-  },
-  {
-    key: 'account',
-    label: '账户',
-    badge: currentUser.value ? currentUser.value.username : '未登录',
-  },
-  {
-    key: 'settings',
-    label: '设置',
-  },
-].filter((item) => item.visible !== false))
+const sideNavItems = computed<SideNavItem[]>(() => {
+  const items: SideNavItem[] = [
+    {
+      key: 'store',
+      label: '商店',
+      badge: plugins.value.length,
+    },
+    {
+      key: 'installed',
+      label: '已安装',
+      badge: installedViewPlugins.value.length,
+      visible: canUseInternalPluginApis.value,
+    },
+    {
+      key: 'notifications',
+      label: '通知',
+      badge: notificationBadgeText.value,
+    },
+    {
+      key: 'upload',
+      label: '上传',
+    },
+    {
+      key: 'account',
+      label: '账户',
+      badge: currentUser.value ? currentUser.value.username : '未登录',
+    },
+    {
+      key: 'settings',
+      label: '设置',
+    },
+  ]
+
+  return items.filter((item) => item.visible !== false)
+})
 
 function isShareUnavailableForPlugin(pluginName: string): boolean {
   if (isShareDisabledForPlugin(pluginName)) {
@@ -1025,6 +1031,12 @@ onUnmounted(() => {
             :selected-version="pluginDetailState.selectedVersion"
             :selected-hash="pluginDetailState.selectedHash"
             :selected-build="selectedPluginBuild"
+            :remote-readme="pluginDetailState.detail?.readme ?? null"
+            :source-label="selectedSourceLabel"
+            :build-source-label="selectedBuildSourceLabel"
+            :risk="pluginDetailState.risk"
+            :risk-loading="pluginDetailState.riskLoading"
+            :risk-error="pluginDetailState.riskError"
             :install-action-text="selectedPluginActionText"
             @back="closePlugin"
             @open="handleOpenPlugin(mergedSelectedPlugin)"
@@ -1055,11 +1067,14 @@ onUnmounted(() => {
 }
 
 .side-nav {
+  display: flex;
+  flex-direction: column;
   width: 200px;
   border-right: 1px solid var(--divider-color);
   padding: 12px 8px;
-  overflow-y: auto;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .side-nav-header {
@@ -1081,8 +1096,10 @@ onUnmounted(() => {
 
 .side-nav-list {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
   padding: 0 4px;
   overflow-y: auto;
 }

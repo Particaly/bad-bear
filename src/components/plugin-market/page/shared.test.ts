@@ -8,6 +8,8 @@ import {
   buildPluginVersionOptions,
   buildPluginHashOptions,
   buildResolvedPluginDownloadTarget,
+  mapPluginSourceLabel,
+  parsePluginSourceReference,
   resolveSelectedVersion,
   resolveSelectedHash,
   mergePluginDetailIntoPlugin,
@@ -208,7 +210,16 @@ describe('plugin market page helpers', () => {
       ratingCount: 100,
       totalDownloads: 1000,
       versions: [
-        { id: '1', version: '2.0.0', hash: 'def456', fileSize: 1024, downloads: 100, createdAt: '2026-04-01T00:00:00Z' },
+        {
+          id: '1',
+          version: '2.0.0',
+          hash: 'def456',
+          fileSize: 1024,
+          downloads: 100,
+          createdAt: '2026-04-01T00:00:00Z',
+          source: 'provider-sync',
+          uploaderUsername: 'octocat',
+        },
         { id: '2', version: '1.5.0', hash: 'abc123', fileSize: 1024, downloads: 50, createdAt: '2026-03-01T00:00:00Z' },
         { id: '3', version: '2.0.0', hash: 'xyz789', fileSize: 1024, downloads: 20, createdAt: '2026-04-02T00:00:00Z' },
       ],
@@ -247,6 +258,8 @@ describe('plugin market page helpers', () => {
       expect(options).toHaveLength(2)
       expect(options[0].value).toBe('def456')
       expect(options[0].label).toBe('def456（最新构建）')
+      expect(options[0].source).toBe('provider-sync')
+      expect(options[0].uploaderUsername).toBe('octocat')
       expect(options[1].value).toBe('xyz789')
     })
 
@@ -270,6 +283,17 @@ describe('plugin market page helpers', () => {
       expect(hash).toBe('def456')
     })
 
+    it('maps provider-backed sources through public provider display names', () => {
+      const reference = parsePluginSourceReference({ type: 'provider-sync', providerId: 'provider-1' })
+      const label = mapPluginSourceLabel(reference, { id: 'provider-1', publicName: 'NPM 官方源' })
+      expect(label).toBe('来源同步 · NPM 官方源')
+    })
+
+    it('maps uploaded sources without exposing raw payloads', () => {
+      const reference = parsePluginSourceReference('manual-upload')
+      expect(mapPluginSourceLabel(reference, null)).toBe('用户上传')
+    })
+
     it('merges plugin detail into plugin', () => {
       const plugin: PluginMarketUiPlugin = {
         name: 'test-plugin',
@@ -283,7 +307,22 @@ describe('plugin market page helpers', () => {
         avgRating: null,
         ratingCount: null,
       }
-      const merged = mergePluginDetailIntoPlugin(plugin, mockDetail)
+      const merged = mergePluginDetailIntoPlugin(
+        plugin,
+        {
+          ...mockDetail,
+          title: 'Detail Title',
+          description: 'Detail Description',
+          author: 'Detail Author',
+          main: 'dist/main.js',
+          preload: 'dist/preload.js',
+        },
+      )
+      expect(merged.title).toBe('Detail Title')
+      expect(merged.description).toBe('Detail Description')
+      expect(merged.author).toBe('Detail Author')
+      expect(merged.main).toBe('dist/main.js')
+      expect(merged.preload).toBe('dist/preload.js')
       expect(merged.totalDownloads).toBe(1000)
       expect(merged.avgRating).toBe(4.5)
       expect(merged.ratingCount).toBe(100)

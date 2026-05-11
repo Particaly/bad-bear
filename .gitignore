@@ -9,6 +9,8 @@ out
 .vscode/settings.json
 /.history
 .idea
+.yalc
+yalc.lock
 
 # uTools 源码缓存（用于同步 API Types）
 .ztools-api-types-source/

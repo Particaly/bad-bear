@@ -62,8 +62,8 @@ export function usePluginMarketUploads(options: {
 
   function validateFile(file: File): string {
     const name = file.name.toLowerCase()
-    if (!name.endsWith('.zpx')) {
-      return '仅支持 .zpx 格式的插件包'
+    if (!name.endsWith('.zpx') && !name.endsWith('.zip')) {
+      return '仅支持 .zpx 或 .zip 格式的插件包'
     }
     if (file.size > MAX_UPLOAD_SIZE) {
       return '文件大小不能超过 50MB'

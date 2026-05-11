@@ -1,17 +1,25 @@
 <script setup lang="ts">
+import 'highlight.js/styles/atom-one-dark.css'
 import { toRef } from 'vue'
-import type { PluginMarketUiPlugin } from '../../../types/pluginMarket'
+import type { PluginDetailReadme, PluginMarketUiPlugin } from '../../../types/pluginMarket'
 import { usePluginReadme } from './usePluginReadme'
 
 const props = defineProps<{
   plugin: PluginMarketUiPlugin
+  remoteReadme?: PluginDetailReadme | null
 }>()
 
-const { readmeLoading, readmeError, renderedMarkdown } = usePluginReadme(toRef(props, 'plugin'))
+const { readmeLoading, readmeError, renderedMarkdown, showAiGeneratedBadge } = usePluginReadme(
+  toRef(props, 'plugin'),
+  toRef(props, 'remoteReadme'),
+)
 </script>
 
 <template>
   <div class="readme-panel">
+    <div v-if="!readmeLoading && showAiGeneratedBadge" class="readme-meta">
+      <span class="readme-meta-badge readme-meta-badge--ai">AI 生成</span>
+    </div>
     <div v-if="readmeLoading" class="loading-container">
       <div class="spinner"></div>
       <span>加载中...</span>
@@ -27,6 +35,30 @@ const { readmeLoading, readmeError, renderedMarkdown } = usePluginReadme(toRef(p
 <style scoped>
 .readme-panel {
   min-height: 200px;
+}
+
+.readme-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.readme-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.readme-meta-badge--ai {
+  color: var(--purple-color);
+  background: var(--purple-light-bg);
 }
 
 .loading-container,
@@ -75,24 +107,57 @@ const { readmeLoading, readmeError, renderedMarkdown } = usePluginReadme(toRef(p
   color: var(--text-color);
 }
 
-.markdown-content :deep(p),
-.markdown-content :deep(ul),
-.markdown-content :deep(ol),
-.markdown-content :deep(pre) {
+.markdown-content :deep(p) {
   margin: 12px 0;
 }
 
-.markdown-content :deep(code) {
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 12px 0;
+  padding-inline-start: 1.5em;
+  list-style-position: outside;
+}
+
+.markdown-content :deep(li) {
+  margin: 4px 0;
+}
+
+.markdown-content :deep(code:not(.hljs)) {
   padding: 2px 6px;
   border-radius: 6px;
   background: var(--surface-elevated);
 }
 
 .markdown-content :deep(pre) {
-  padding: 12px;
+  padding: 0;
   border-radius: 12px;
   overflow: auto;
   background: var(--surface-elevated);
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-content :deep(table) {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+  border: 1px solid var(--divider-color);
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid var(--divider-color);
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-content :deep(th) {
+  background: var(--surface-elevated);
+  font-weight: 600;
 }
 
 @keyframes spin {

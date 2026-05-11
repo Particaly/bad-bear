@@ -10,7 +10,8 @@ export type InstalledBusyAction = 'reload' | 'share' | 'uninstall' | null
 import type {
   PluginCommentRecord,
   PluginRatingRecord,
-  PluginDetailVersion,
+  PluginRiskInfo,
+  PublicProviderRecord,
 } from '../../../types/pluginMarket'
 
 // 插件评论分页大小
@@ -22,6 +23,11 @@ export interface PluginDetailState {
   detail: import('../../../types/pluginMarket').PluginDetailResponse | null
   selectedVersion: string | null
   selectedHash: string | null
+  risk: PluginRiskInfo | null
+  riskLoading: boolean
+  riskError: string
+  sourceProvider: PublicProviderRecord | null
+  buildSourceProvider: PublicProviderRecord | null
   comments: PluginCommentRecord[]
   currentUserRating: PluginRatingRecord | null
   commentPage: number
@@ -56,6 +62,11 @@ export function createEmptyPluginDetailState(): PluginDetailState {
     detail: null,
     selectedVersion: null,
     selectedHash: null,
+    risk: null,
+    riskLoading: false,
+    riskError: '',
+    sourceProvider: null,
+    buildSourceProvider: null,
     comments: [],
     currentUserRating: null,
     commentPage: 1,

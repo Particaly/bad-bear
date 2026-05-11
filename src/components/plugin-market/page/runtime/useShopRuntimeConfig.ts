@@ -16,6 +16,7 @@ import { getErrorMessage } from '../shared'
 
 export function useShopRuntimeConfig(options: {
   notifyError: (message: string) => void
+  notifySuccess: (message: string) => void
   onAuthChanged: () => Promise<void>
   onGithubBindingRefresh: () => Promise<void>
   onGithubBindingReset: () => void
@@ -98,8 +99,29 @@ export function useShopRuntimeConfig(options: {
     const runtimeConfig = loadShopApiRuntimeConfig()
     runtimeConfigLoaded.value = true
 
+    let shouldRestoreSession = !!runtimeConfig.token
+
+    if (typeof window !== 'undefined') {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const githubToken = hashParams.get('github_token')?.trim() || ''
+      const githubError = new URLSearchParams(window.location.search).get('githubError')?.trim() || ''
+
+      if (githubToken) {
+        saveShopApiRuntimeConfig({ token: githubToken, currentUser: null })
+        shouldRestoreSession = true
+        options.notifySuccess('GitHub 登录成功，正在恢复账号信息')
+      } else if (githubError) {
+        options.notifyError(`GitHub 登录失败：${githubError}`)
+      }
+
+      if (githubToken || githubError) {
+        const nextUrl = `${window.location.pathname}${window.location.search.replace(/([?&])githubError=[^&]*&?/, '$1').replace(/[?&]$/, '')}`
+        window.history.replaceState(null, '', nextUrl)
+      }
+    }
+
     // 如果有令牌，恢复会话
-    if (runtimeConfig.token) {
+    if (shouldRestoreSession) {
       isRestoringSession.value = true
       void refreshCurrentUser({ silent: true }).finally(() => {
         isRestoringSession.value = false

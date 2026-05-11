@@ -6,9 +6,11 @@ import PluginVersionDialog from './detail/PluginVersionDialog.vue'
 import { formatDownloads, formatSize } from './detail/formatters'
 import type {
   PluginCommentTreeNode,
+  PluginDetailReadme,
   PluginDetailVersion,
   PluginHashOption,
   PluginMarketUiPlugin,
+  PluginRiskInfo,
   PluginVersionOption,
 } from '../../types/pluginMarket'
 
@@ -42,6 +44,12 @@ const props = defineProps<{
   selectedVersion?: string | null
   selectedHash?: string | null
   selectedBuild?: PluginDetailVersion | null
+  remoteReadme?: PluginDetailReadme | null
+  sourceLabel?: string
+  buildSourceLabel?: string
+  risk?: PluginRiskInfo | null
+  riskLoading?: boolean
+  riskError?: string
   installActionText?: string
 }>()
 
@@ -71,6 +79,25 @@ const hasBuildOptions = computed(() => (props.versionOptions?.length || 0) > 0)
 const currentVersion = computed(() => props.selectedVersion || props.plugin.version || '-')
 const displayAverageRating = computed(() => props.avgRating ?? props.plugin.avgRating ?? 0)
 const displayRatingCount = computed(() => props.ratingCount ?? props.plugin.ratingCount ?? 0)
+
+const detailSourceText = computed(() => props.sourceLabel || '')
+const buildSourceText = computed(() => props.buildSourceLabel || '')
+const hasVisibleRisk = computed(() => {
+  if (!props.risk || props.riskError || props.riskLoading) {
+    return false
+  }
+
+  const normalized = String(props.risk.riskLevel || '').trim().toUpperCase()
+  return !!normalized && normalized !== 'SAFE' && normalized !== 'NONE' && normalized !== 'LOW'
+})
+const buildUploaderText = computed(() => {
+  const build = props.selectedBuild
+  if (!build) {
+    return ''
+  }
+
+  return build.uploaderUsername || build.uploaderAccount || build.uploaderUserId || ''
+})
 
 function isBusyAction(action: Exclude<PluginDetailBusyAction, null>): boolean {
   return props.busyAction === action
@@ -180,6 +207,7 @@ watch(
               <div class="detail-title">
                 <span class="detail-name">{{ plugin.title || plugin.name }}</span>
                 <span class="detail-version" :class="{ 'detail-version--clickable': hasBuildOptions }" @click="openVersionModal">v{{ currentVersion }}</span>
+                <span v-if="detailSourceText" class="detail-badge detail-badge-source">{{ detailSourceText }}</span>
                 <div class="detail-badges">
                   <span v-if="plugin.installed" class="detail-badge">已安装</span>
                   <span v-if="plugin.isDevelopment" class="detail-badge detail-badge-dev">开发中</span>
@@ -221,6 +249,15 @@ watch(
             </div>
           </div>
         </div>
+
+        <div v-if="hasVisibleRisk" class="detail-risk-card card">
+          <div class="detail-risk-header">
+            <span class="detail-risk-title">风险提示</span>
+          </div>
+          <div v-if="risk" class="detail-risk-body">
+            <div>{{ risk.riskSummary?.summary || '暂无风险摘要' }}</div>
+          </div>
+        </div>
       </div>
 
       <div class="tab-container">
@@ -238,7 +275,7 @@ watch(
 
         <div class="tab-content">
           <div v-if="activeTab === 'detail'" class="tab-panel">
-            <PluginReadmePanel :plugin="plugin" />
+            <PluginReadmePanel :plugin="plugin" :remote-readme="remoteReadme" />
           </div>
 
           <div v-if="activeTab === 'commands'" class="tab-panel">
@@ -287,6 +324,8 @@ watch(
       :install-action-text="installActionText"
       :busy-action="busyAction"
       :can-install-from-market="canInstallFromMarket"
+      :build-source-text="buildSourceText"
+      :build-uploader-text="buildUploaderText"
       @update:visible="isVersionModalOpen = $event"
       @install="handleInstallAction"
       @select-version="emit('select-version', $event)"
@@ -487,6 +526,11 @@ watch(
 .detail-badge-dev {
   color: var(--purple-color);
   background: var(--purple-light-bg);
+}
+
+.detail-badge-source {
+  color: var(--primary-color);
+  background: var(--active-bg);
 }
 
 .detail-badge-running {

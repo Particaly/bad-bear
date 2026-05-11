@@ -24,6 +24,8 @@ const props = defineProps<{
   installActionText?: string
   busyAction?: PluginDetailBusyAction
   canInstallFromMarket?: boolean
+  buildSourceText?: string
+  buildUploaderText?: string
 }>()
 
 const emit = defineEmits<{
@@ -136,6 +138,14 @@ function handleVersionModalInstall(): void {
               <span class="build-meta-inline-item">
                 <span class="build-meta-label">上传时间</span>
                 <span class="build-meta-value">{{ formatDateTime(selectedBuild.createdAt) }}</span>
+              </span>
+              <span v-if="buildSourceText" class="build-meta-inline-item">
+                <span class="build-meta-label">构建来源</span>
+                <span class="build-meta-value">{{ buildSourceText }}</span>
+              </span>
+              <span v-if="buildUploaderText" class="build-meta-inline-item">
+                <span class="build-meta-label">上传者</span>
+                <span class="build-meta-value">{{ buildUploaderText }}</span>
               </span>
             </div>
           </div>

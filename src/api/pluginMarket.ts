@@ -1,5 +1,10 @@
 export {
   getPluginDetail,
+  getPluginDetailByHash,
+  getPluginRisk,
+  getPluginVersionBuilds,
+  getPluginStats,
+  getPublicProviderById,
   getPluginRatings,
   createPluginRating,
   getPluginComments,

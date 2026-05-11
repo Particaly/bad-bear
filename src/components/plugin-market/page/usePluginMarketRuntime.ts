@@ -23,6 +23,7 @@ export function usePluginMarketRuntime(options: {
   // 运行时配置和认证状态
   const runtimeConfig = useShopRuntimeConfig({
     notifyError: options.notifyError,
+    notifySuccess: options.notifySuccess,
     onAuthChanged: options.onAuthChanged,
     onGithubBindingRefresh: async () => {
       await onGithubBindingRefreshHook?.()

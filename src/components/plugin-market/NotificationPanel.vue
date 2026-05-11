@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ZButton, ZPagination } from 'ztools-ui'
 import type { AuthUser } from '../../types/auth'
 import type {
   NotificationFilter,
@@ -97,17 +98,17 @@ function closeDetail(): void {
       </div>
 
       <div class="hero-actions">
-        <button class="btn  btn-ghost" type="button" :disabled="loading" @click="emit('refresh')">
+        <ZButton :disabled="loading" @click="emit('refresh')">
           刷新
-        </button>
-        <button
-          class="btn btn-md btn-primary"
-          type="button"
+        </ZButton>
+        <ZButton
+          type="primary"
           :disabled="!canMarkAllRead"
+          :loading="markingAllRead"
           @click="emit('mark-all-read')"
         >
-          {{ markingAllRead ? '处理中...' : '全部已读' }}
-        </button>
+          全部已读
+        </ZButton>
       </div>
     </div>
 
@@ -115,7 +116,7 @@ function closeDetail(): void {
       <div class="panel-card section-card empty-card">
         <h3 class="section-title">登录后查看通知</h3>
         <div class="login-cta">
-          <button class="btn btn-primary" type="button" @click="emit('go-login')">前往登录</button>
+          <ZButton type="primary" @click="emit('go-login')">前往登录</ZButton>
         </div>
       </div>
     </template>
@@ -145,7 +146,7 @@ function closeDetail(): void {
 
         <div v-else-if="error" class="error-container">
           <span>{{ error }}</span>
-          <button class="btn btn-ghost" type="button" @click="emit('refresh')">重试</button>
+          <ZButton @click="emit('refresh')">重试</ZButton>
         </div>
 
         <div v-else-if="items.length === 0" class="empty-message">{{ emptyStateText }}</div>
@@ -243,14 +244,15 @@ function closeDetail(): void {
           </div>
         </Teleport>
 
-        <div v-if="shouldShowPagination" class="pagination-row">
-          <button class="btn btn-ghost" type="button" :disabled="!canGoPrev" @click="emit('change-page', page - 1)">
-            上一页
-          </button>
+        <div v-if="shouldShowPagination" class="pagination-row pagination-row--stacked">
           <span class="pagination-text">共 {{ total }} 条，当前第 {{ page }} / {{ totalPages }} 页</span>
-          <button class="btn btn-ghost" type="button" :disabled="!canGoNext" @click="emit('change-page', page + 1)">
-            下一页
-          </button>
+          <ZPagination
+            :page="page"
+            :page-size="pageSize"
+            :item-count="total"
+            size="small"
+            @update:page="emit('change-page', $event)"
+          />
         </div>
       </div>
     </template>
@@ -433,6 +435,11 @@ function closeDetail(): void {
   gap: 10px;
 }
 
+.pagination-row--stacked {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
 .notification-toolbar {
   display: flex;
   align-items: center;
@@ -453,14 +460,17 @@ function closeDetail(): void {
 .filter-tab {
   min-width: 68px;
   padding: 8px 14px;
+  border: 2px solid var(--primary-color);
   border-radius: 999px;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 700;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .filter-tab.active {
+  border-color: var(--primary-color);
   background: var(--primary-color);
   color: var(--text-on-primary);
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ZButton, ZInput } from 'ztools-ui'
 import type {
   AuthUser,
   GitHubBindingState,
@@ -417,25 +418,19 @@ function handleAvatarChange(event: Event): void {
           <div class="github-flow-status">{{ githubFlowStatusText }}</div>
 
           <div class="action-row github-flow-actions">
-            <button class="btn btn-primary" type="button" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
+            <ZButton type="primary" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
               打开 GitHub 授权页
-            </button>
-            <button
+            </ZButton>
+            <ZButton
               v-if="githubDeviceFlow.phase === 'error' || githubDeviceFlow.phase === 'expired'"
-              class="btn btn-ghost"
-              type="button"
               :disabled="busy"
               @click="githubDeviceFlow.purpose === 'bind' ? emit('github-bind') : emit('github-login')"
             >
               重新发起
-            </button>
-            <button
-              class="btn btn-ghost"
-              type="button"
-              @click="emit('github-cancel-device-flow')"
-            >
+            </ZButton>
+            <ZButton @click="emit('github-cancel-device-flow')">
               取消
-            </button>
+            </ZButton>
           </div>
         </div>
       </div>
@@ -505,9 +500,9 @@ function handleAvatarChange(event: Event): void {
             </div>
           </div>
 
-          <button class="btn profile-logout-btn" :disabled="busy" @click="emit('logout')">
+          <ZButton class="profile-logout-btn" :disabled="busy" @click="emit('logout')">
             退出登录
-          </button>
+          </ZButton>
         </div>
       </div>
 
@@ -531,21 +526,21 @@ function handleAvatarChange(event: Event): void {
             </div>
 
             <label class="field-label" for="username-modal-input">用户名</label>
-            <input
+            <ZInput
               id="username-modal-input"
               v-model="usernameDraft"
               class="text-input"
               type="text"
-              maxlength="50"
+              :maxlength="50"
               :disabled="busy"
               placeholder="输入新的显示名称"
             />
 
             <div class="action-row action-row--end">
-              <button class="btn btn-ghost" type="button" :disabled="busy" @click="closeUsernameModal">取消</button>
-              <button class="btn btn-primary" :disabled="busy" @click="submitUsernameUpdate">
-                {{ isUpdatingUsername ? '保存中...' : '保存用户名' }}
-              </button>
+              <ZButton :disabled="busy" @click="closeUsernameModal">取消</ZButton>
+              <ZButton type="primary" :disabled="busy" :loading="isUpdatingUsername" @click="submitUsernameUpdate">
+                保存用户名
+              </ZButton>
             </div>
           </div>
         </div>
@@ -565,33 +560,33 @@ function handleAvatarChange(event: Event): void {
             </div>
 
             <label class="field-label" for="password-current-modal-input">原密码</label>
-            <input
+            <ZInput
               id="password-current-modal-input"
               v-model="currentPasswordDraft"
               class="text-input"
               type="password"
-              maxlength="72"
+              :maxlength="72"
               :disabled="busy"
               placeholder="如已设置密码，请输入原密码"
             />
 
             <label class="field-label" for="password-new-modal-input">新密码</label>
-            <input
+            <ZInput
               id="password-new-modal-input"
               v-model="newPasswordDraft"
               class="text-input"
               type="password"
-              maxlength="72"
+              :maxlength="72"
               :disabled="busy"
               placeholder="请输入新密码"
               @keydown.enter="submitPasswordUpdate"
             />
 
             <div class="action-row action-row--end">
-              <button class="btn btn-ghost" type="button" :disabled="busy" @click="closePasswordModal">取消</button>
-              <button class="btn btn-primary" :disabled="busy" @click="submitPasswordUpdate">
-                {{ isUpdatingPassword ? '保存中...' : '保存密码' }}
-              </button>
+              <ZButton :disabled="busy" @click="closePasswordModal">取消</ZButton>
+              <ZButton type="primary" :disabled="busy" :loading="isUpdatingPassword" @click="submitPasswordUpdate">
+                保存密码
+              </ZButton>
             </div>
           </div>
         </div>
@@ -614,10 +609,10 @@ function handleAvatarChange(event: Event): void {
             </div>
 
             <div class="action-row action-row--end">
-              <button class="btn btn-ghost" type="button" :disabled="busy" @click="closeAvatarModal">取消</button>
-              <button class="btn btn-primary" :disabled="busy" @click="triggerAvatarSelect">
-                {{ isUploadingAvatar ? '上传中...' : '选择头像文件' }}
-              </button>
+              <ZButton :disabled="busy" @click="closeAvatarModal">取消</ZButton>
+              <ZButton type="primary" :disabled="busy" :loading="isUploadingAvatar" @click="triggerAvatarSelect">
+                选择头像文件
+              </ZButton>
             </div>
           </div>
         </div>
@@ -630,23 +625,23 @@ function handleAvatarChange(event: Event): void {
 
         <template v-if="authMode === 'login'">
           <label class="field-label" for="login-account">账号</label>
-          <input
+          <ZInput
             id="login-account"
             v-model="loginAccount"
             class="text-input"
             type="text"
-            maxlength="50"
+            :maxlength="50"
             :disabled="busy"
             placeholder="输入注册账号"
           />
 
           <label class="field-label" for="login-password">密码</label>
-          <input
+          <ZInput
             id="login-password"
             v-model="loginPassword"
             class="text-input"
             type="password"
-            maxlength="72"
+            :maxlength="72"
             :disabled="busy"
             placeholder="输入密码"
             @keydown.enter="submitLogin"
@@ -654,14 +649,12 @@ function handleAvatarChange(event: Event): void {
 
           <label class="field-label" for="login-captcha">验证码</label>
           <div class="captcha-row">
-            <input
+            <ZInput
               id="login-captcha"
               v-model="captchaCode"
               class="text-input captcha-input"
               type="text"
-              maxlength="10"
-              inputmode="numeric"
-              autocomplete="off"
+              :maxlength="10"
               :disabled="busy"
               placeholder="计算结果"
               @keydown.enter="submitLogin"
@@ -684,9 +677,8 @@ function handleAvatarChange(event: Event): void {
           </div>
 
           <div class="action-row action-row--end auth-login-actions">
-            <button
-              class="btn btn-ghost github-login-btn"
-              type="button"
+            <ZButton
+              class="github-login-btn"
               :disabled="busy"
               @click="emit('github-login')"
             >
@@ -699,44 +691,44 @@ function handleAvatarChange(event: Event): void {
               <span>
                 {{ isGithubDeviceFlowBusy && githubDeviceFlow.purpose === 'login' ? 'GitHub 登录中...' : 'GitHub 登录' }}
               </span>
-            </button>
-            <button class="btn btn-primary" :disabled="busy" @click="submitLogin">
-              {{ isLoggingIn ? '登录中...' : '登录' }}
-            </button>
+            </ZButton>
+            <ZButton type="primary" :disabled="busy" :loading="isLoggingIn" @click="submitLogin">
+              登录
+            </ZButton>
           </div>
           <div class="auth-status">首次使用 GitHub 登录会自动注册站内账号。</div>
         </template>
 
         <template v-else>
           <label class="field-label" for="register-account">账号</label>
-          <input
+          <ZInput
             id="register-account"
             v-model="registerAccount"
             class="text-input"
             type="text"
-            maxlength="50"
+            :maxlength="50"
             :disabled="busy"
             placeholder="3-50 字符，仅字母/数字/_/-"
           />
 
           <label class="field-label" for="register-username">用户名</label>
-          <input
+          <ZInput
             id="register-username"
             v-model="registerUsername"
             class="text-input"
             type="text"
-            maxlength="50"
+            :maxlength="50"
             :disabled="busy"
             placeholder="输入显示名称"
           />
 
           <label class="field-label" for="register-password">密码</label>
-          <input
+          <ZInput
             id="register-password"
             v-model="registerPassword"
             class="text-input"
             type="password"
-            maxlength="72"
+            :maxlength="72"
             :disabled="busy"
             placeholder="8-72 字符"
             @keydown.enter="submitRegister"
@@ -744,14 +736,12 @@ function handleAvatarChange(event: Event): void {
 
           <label class="field-label" for="register-captcha">验证码</label>
           <div class="captcha-row">
-            <input
+            <ZInput
               id="register-captcha"
               v-model="captchaCode"
               class="text-input captcha-input"
               type="text"
-              maxlength="10"
-              inputmode="numeric"
-              autocomplete="off"
+              :maxlength="10"
               :disabled="busy"
               placeholder="计算结果"
               @keydown.enter="submitRegister"
@@ -774,9 +764,9 @@ function handleAvatarChange(event: Event): void {
           </div>
 
           <div class="action-row action-row--end">
-            <button class="btn btn-primary" :disabled="busy" @click="submitRegister">
-              {{ isRegistering ? '注册中...' : '注册并登录' }}
-            </button>
+            <ZButton type="primary" :disabled="busy" :loading="isRegistering" @click="submitRegister">
+              注册并登录
+            </ZButton>
           </div>
         </template>
       </div>
@@ -951,12 +941,14 @@ function handleAvatarChange(event: Event): void {
   width: 30px;
   height: 30px;
   padding: 0;
+  border: 2px solid var(--primary-color);
   border-radius: 999px;
   background: transparent;
   color: var(--text-secondary);
   transition:
     background-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .profile-password-btn:hover:not(:disabled),

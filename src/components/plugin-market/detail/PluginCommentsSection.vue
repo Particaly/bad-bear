@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ZButton } from 'ztools-ui'
 import { buildShopApiAssetUrl } from '../../../config/runtimeConfig'
 import type { PluginCommentTreeNode } from '../../../types/pluginMarket'
 import { formatDateTime } from '../utils'
@@ -157,14 +158,14 @@ watch(
         </div>
       </div>
 
-      <button
-        class="btn btn-ghost rating-trigger-btn"
+      <ZButton
+        class="rating-trigger-btn"
         :disabled="ratingSubmitting"
         @click="openRatingModal"
       >
         <span v-if="ratingSubmitting">提交中...</span>
         <span v-else>{{ ratingActionText }}</span>
-      </button>
+      </ZButton>
     </div>
 
     <div class="comment-section">
@@ -207,15 +208,16 @@ watch(
             <div class="comment-editor-footer">
               <span class="comment-counter">{{ replyDraftLength }}/1000</span>
               <div class="reply-actions">
-                <button class="btn btn-ghost" :disabled="commentSubmitting" @click="cancelReply">取消</button>
-                <button
-                  class="btn comment-submit-btn"
+                <ZButton :disabled="commentSubmitting" @click="cancelReply">取消</ZButton>
+                <ZButton
+                  class="comment-submit-btn"
+                  type="primary"
                   :disabled="commentSubmitting || !replyDraft.trim()"
+                  :loading="commentSubmitting"
                   @click="handleSubmitReply(comment.id)"
                 >
-                  <span v-if="commentSubmitting">提交中...</span>
-                  <span v-else>提交回复</span>
-                </button>
+                  提交回复
+                </ZButton>
               </div>
             </div>
           </div>
@@ -240,10 +242,9 @@ watch(
       </div>
 
       <div v-if="hasMoreComments && !commentsLoading" class="load-more-wrap">
-        <button class="btn btn-ghost" :disabled="commentsLoadingMore" @click="emit('load-more-comments')">
-          <span v-if="commentsLoadingMore">加载中...</span>
-          <span v-else>加载更多</span>
-        </button>
+        <ZButton :disabled="commentsLoadingMore" :loading="commentsLoadingMore" @click="emit('load-more-comments')">
+          加载更多
+        </ZButton>
       </div>
     </div>
 
@@ -273,11 +274,10 @@ watch(
         <div class="selected-rating-text">当前：{{ selectedRating }} 星</div>
 
         <div class="rating-modal-actions">
-          <button class="btn btn-ghost" :disabled="ratingSubmitting" @click="closeRatingModal">取消</button>
-          <button class="btn btn-primary rating-submit-btn" :disabled="ratingSubmitting" @click="handleSubmitRating">
-            <span v-if="ratingSubmitting">提交中...</span>
-            <span v-else>{{ currentUserRatingValue ? '更新评分' : '提交评分' }}</span>
-          </button>
+          <ZButton :disabled="ratingSubmitting" @click="closeRatingModal">取消</ZButton>
+          <ZButton class="rating-submit-btn" type="primary" :disabled="ratingSubmitting" :loading="ratingSubmitting" @click="handleSubmitRating">
+            {{ currentUserRatingValue ? '更新评分' : '提交评分' }}
+          </ZButton>
         </div>
       </div>
     </div>
@@ -304,10 +304,9 @@ watch(
 
       <div class="comment-editor-footer">
         <span class="comment-counter">{{ commentDraftLength }}/1000</span>
-        <button class="btn comment-submit-btn" :disabled="commentSubmitting || !commentDraft.trim()" @click="handleSubmitComment">
-          <span v-if="commentSubmitting">提交中...</span>
-          <span v-else>发表评论</span>
-        </button>
+        <ZButton class="comment-submit-btn" type="primary" :disabled="commentSubmitting || !commentDraft.trim()" :loading="commentSubmitting" @click="handleSubmitComment">
+          发表评论
+        </ZButton>
       </div>
     </div>
   </div>

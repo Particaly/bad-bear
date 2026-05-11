@@ -88,6 +88,8 @@ interface ZToolsInternal {
 
 interface ZToolsApi {
   internal: ZToolsInternal
+  getThemeInfo?(): ThemeInfo
+  onThemeChange?(callback: (theme: ThemeInfo) => void): void
   showTip(message: string): void
   showToast(message: string): void
   shellOpenExternal(url: string): void

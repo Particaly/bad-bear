@@ -1,48 +1,28 @@
-type ThemePayload = {
-  isDark: boolean
-  windowMaterial: string
-  primaryColor?: string
-  customColor?: string
-}
+import { useZtoolsTheme } from 'ztools-ui'
 
-function applyTheme(theme: ThemePayload): void {
-  document.documentElement.setAttribute('data-material', theme.windowMaterial)
-  document.documentElement.classList.toggle('dark', theme.isDark)
+let themeInitialized = false
 
-  const themeClasses = [
-    'theme-blue',
-    'theme-purple',
-    'theme-green',
-    'theme-orange',
-    'theme-red',
-    'theme-pink',
-    'theme-custom',
-  ]
-  document.body.classList.remove(...themeClasses)
-
-  if (theme.primaryColor) {
-    document.body.classList.add(`theme-${theme.primaryColor}`)
+function ensureThemeBridge(): void {
+  if (typeof window.ztools.getThemeInfo !== 'function') {
+    window.ztools.getThemeInfo = () => window.services.getThemeInfo()
   }
 
-  if (theme.customColor) {
-    document.documentElement.style.setProperty('--primary-color', theme.customColor)
+  if (typeof window.ztools.onThemeChange !== 'function') {
+    window.ztools.onThemeChange = (callback) => window.services.onThemeChange(callback)
   }
-}
 
-function applyOsClass(platform: string): void {
-  document.documentElement.classList.remove('os-mac', 'os-windows', 'os-linux')
-
-  if (platform === 'darwin') {
-    document.documentElement.classList.add('os-mac')
-  } else if (platform === 'win32') {
-    document.documentElement.classList.add('os-windows')
-  } else {
-    document.documentElement.classList.add('os-linux')
+  if (typeof window.ztools.internal.getPlatform !== 'function') {
+    window.ztools.internal.getPlatform = () => window.services.getSystemInfo().platform
   }
 }
 
 export function useTheme() {
-  applyTheme(window.services.getThemeInfo())
-  window.services.onThemeChange((theme) => applyTheme(theme))
-  applyOsClass(window.services.getSystemInfo().platform)
+  ensureThemeBridge()
+
+  if (themeInitialized) {
+    return
+  }
+
+  useZtoolsTheme()
+  themeInitialized = true
 }

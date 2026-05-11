@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ZButton } from 'ztools-ui'
 import type { AuthUser } from '../../types/auth'
 import type {
   MyPluginUploadRecord,
@@ -119,7 +120,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
     <div v-if="!isLoggedIn" class="panel-card section-card empty-card">
       <h3 class="section-title">登录后上传插件</h3>
       <div class="login-cta">
-        <button class="btn btn-primary" type="button" @click="emit('go-login')">前往登录</button>
+        <ZButton type="primary" @click="emit('go-login')">前往登录</ZButton>
       </div>
     </div>
 
@@ -129,22 +130,19 @@ function canDelete(record: MyPluginUploadRecord): boolean {
         <div class="section-header">
           <h3 class="section-title">我的上传记录</h3>
           <div class="section-actions">
-            <button
-              class="btn btn-primary"
-              type="button"
+            <ZButton
+              type="primary"
               :disabled="!canSelectFile"
               @click="($refs.fileInput as HTMLInputElement | null)?.click()"
             >
               上传插件
-            </button>
-            <button
-              class="btn btn-ghost"
-              type="button"
+            </ZButton>
+            <ZButton
               :disabled="uploadsLoading"
               @click="emit('refresh-uploads')"
             >
               刷新
-            </button>
+            </ZButton>
           </div>
         </div>
 
@@ -165,46 +163,41 @@ function canDelete(record: MyPluginUploadRecord): boolean {
           <div v-if="validationError" class="validation-error">{{ validationError }}</div>
 
           <div v-if="selectedFile && !validationError" class="upload-actions">
-            <button
+            <ZButton
               v-if="hashCheckResult === null"
-              class="btn btn-ghost"
-              type="button"
               :disabled="!canPrecheck"
               @click="emit('precheck')"
             >
               {{ isHashing ? '计算哈希中...' : isCheckingHash ? '预检中...' : '预检文件' }}
-            </button>
+            </ZButton>
 
             <div v-if="hashCheckResult" class="hash-check-result" :class="`hash-${hashCheckResult.status}`">
               <span>{{ getHashCheckMessage() }}</span>
-              <button
+              <ZButton
                 v-if="hashCheckResult.status === 'exists' && hashCheckResult.pluginName"
-                class="btn btn-sm btn-ghost"
-                type="button"
+                size="small"
                 @click="emit('open-plugin', hashCheckResult.pluginName!)"
               >
                 查看插件
-              </button>
+              </ZButton>
             </div>
 
             <div class="upload-button-row">
-              <button
+              <ZButton
                 v-if="hashCheckResult?.status === 'safe'"
-                class="btn btn-primary"
-                type="button"
+                type="primary"
                 :disabled="!canUpload"
+                :loading="isUploading"
                 @click="emit('upload')"
               >
-                {{ isUploading ? '上传中...' : '确认上传' }}
-              </button>
-              <button
-                class="btn btn-ghost"
-                type="button"
+                确认上传
+              </ZButton>
+              <ZButton
                 :disabled="isUploading"
                 @click="emit('clear-file')"
               >
                 清空
-              </button>
+              </ZButton>
             </div>
           </div>
         </div>
@@ -216,7 +209,7 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
         <div v-else-if="uploadsError" class="error-container">
           <span>{{ uploadsError }}</span>
-          <button class="btn btn-ghost" type="button" @click="emit('refresh-uploads')">重试</button>
+          <ZButton @click="emit('refresh-uploads')">重试</ZButton>
         </div>
 
         <div v-else-if="uploads.length === 0" class="empty-message">暂无上传记录</div>
@@ -239,15 +232,16 @@ function canDelete(record: MyPluginUploadRecord): boolean {
               <span class="status-badge" :class="getStatusClass(record.status)">
                 {{ getStatusLabel(record.status) }}
               </span>
-              <button
+              <ZButton
                 v-if="canDelete(record)"
-                class="btn btn-sm btn-ghost btn-danger"
-                type="button"
+                type="danger"
+                size="small"
                 :disabled="isDeleting(record.id)"
+                :loading="isDeleting(record.id)"
                 @click="emit('delete-upload', record)"
               >
-                {{ isDeleting(record.id) ? '删除中...' : '删除' }}
-              </button>
+                删除
+              </ZButton>
             </div>
           </div>
         </div>

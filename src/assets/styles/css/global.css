@@ -117,104 +117,107 @@ body::-webkit-scrollbar {
   --primary-color: #db2777;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: #303133;
-    --text-color: #f3f4f6;
-    --text-secondary: #bfc0c3;
-    --border-color: #374151;
-    --divider-color: rgba(255, 255, 255, 0.1);
-    --card-bg: rgba(255, 255, 255, 0.04);
-    --control-bg: rgba(255, 255, 255, 0.04);
-    --control-border: rgba(255, 255, 255, 0.1);
-    --hover-bg: #374151;
-    --input-bg: #374151;
-    --input-border: #374151;
-    --input-focus-bg: #4b5563;
-    --placeholder-color: #b8b8b8;
-    --shadow-color: rgba(0, 0, 0, 0.3);
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --text-on-primary: #ffffff;
-    --highlight-color: #fb923c;
-    --danger-color: #f87171;
-    --warning-color: #fbbf24;
-    --success-color: #34d399;
-    --purple-color: #a78bfa;
-    --purple-light-bg: rgba(139, 92, 246, 0.2);
-    --purple-border: rgba(139, 92, 246, 0.4);
-    --success-light-bg: rgba(52, 211, 153, 0.2);
-    --success-border: rgba(52, 211, 153, 0.4);
-    --warning-light-bg: rgba(251, 191, 36, 0.2);
-    --warning-border: rgba(251, 191, 36, 0.4);
-    --danger-light-bg: rgba(248, 113, 113, 0.2);
-    --danger-border: rgba(248, 113, 113, 0.4);
-    --dialog-bg: #303133;
-  }
+html.dark {
+  --bg-color: #303133;
+  --text-color: #f3f4f6;
+  --text-secondary: #bfc0c3;
+  --border-color: #374151;
+  --divider-color: rgba(255, 255, 255, 0.1);
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --control-bg: rgba(255, 255, 255, 0.04);
+  --control-border: rgba(255, 255, 255, 0.1);
+  --hover-bg: #374151;
+  --input-bg: #374151;
+  --input-border: #374151;
+  --input-focus-bg: #4b5563;
+  --placeholder-color: #b8b8b8;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --text-on-primary: #ffffff;
+  --highlight-color: #fb923c;
+  --danger-color: #f87171;
+  --warning-color: #fbbf24;
+  --success-color: #34d399;
+  --purple-color: #a78bfa;
+  --purple-light-bg: rgba(139, 92, 246, 0.2);
+  --purple-border: rgba(139, 92, 246, 0.4);
+  --success-light-bg: rgba(52, 211, 153, 0.2);
+  --success-border: rgba(52, 211, 153, 0.4);
+  --warning-light-bg: rgba(251, 191, 36, 0.2);
+  --warning-border: rgba(251, 191, 36, 0.4);
+  --danger-light-bg: rgba(248, 113, 113, 0.2);
+  --danger-border: rgba(248, 113, 113, 0.4);
+  --dialog-bg: #303133;
+}
 
-  /* macOS 暗色模式下使用透明背景 */
-  .os-mac:root {
-    --bg-color: transparent;
-  }
+/* macOS 暗色模式下使用透明背景 */
+html.dark.os-mac:root {
+  --bg-color: transparent;
+}
 
-  /* Windows 暗色模式下默认使用普通背景色 */
-  .os-windows:root {
-    --bg-color: #303133;
-  }
+/* Windows 暗色模式下默认使用普通背景色 */
+html.dark.os-windows:root {
+  --bg-color: #303133;
+}
 
-  /* Windows 暗色模式下根据 data-material 属性应用不同材质样式 */
-  .os-windows[data-material='mica'] {
-    --bg-color: transparent;
-    --card-bg: rgba(255, 255, 255, 0.04);
-    --control-bg: rgba(255, 255, 255, 0.06);
-    --hover-bg: rgba(255, 255, 255, 0.05);
-    --active-bg: rgba(255, 255, 255, 0.08);
-    --divider-color: rgba(255, 255, 255, 0.08);
-    --highlight-color: rgba(251, 146, 60, 0.85);
-  }
+/* Windows 暗色模式下根据 data-material 属性应用不同材质样式 */
+html.dark.os-windows[data-material='mica'] {
+  --bg-color: transparent;
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --control-bg: rgba(255, 255, 255, 0.06);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --active-bg: rgba(255, 255, 255, 0.08);
+  --divider-color: rgba(255, 255, 255, 0.08);
+  --highlight-color: rgba(251, 146, 60, 0.85);
+}
 
-  .os-windows[data-material='acrylic'] {
-    --bg-color: transparent;
-    --card-bg: rgba(255, 255, 255, 0.02);
-    --control-bg: rgba(255, 255, 255, 0.04);
-    --hover-bg: rgba(255, 255, 255, 0.05);
-    --active-bg: rgba(255, 255, 255, 0.08);
-    --divider-color: rgba(255, 255, 255, 0.06);
-    --control-border: rgba(255, 255, 255, 0.15);
-    --highlight-color: rgba(251, 146, 60, 0.85);
-  }
+html.dark.os-windows[data-material='acrylic'] {
+  --bg-color: transparent;
+  --card-bg: rgba(255, 255, 255, 0.02);
+  --control-bg: rgba(255, 255, 255, 0.04);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --active-bg: rgba(255, 255, 255, 0.08);
+  --divider-color: rgba(255, 255, 255, 0.06);
+  --control-border: rgba(255, 255, 255, 0.15);
+  --highlight-color: rgba(251, 146, 60, 0.85);
+}
 
-  .os-windows[data-material='none'] {
-    --bg-color: #303133;
-    --card-bg: #3a3a3c;
-    --control-bg: #48484a;
-  }
+html.dark.os-windows[data-material='none'] {
+  --bg-color: #303133;
+  --card-bg: #3a3a3c;
+  --control-bg: #48484a;
+}
 
-  /* 主题色定义 - 暗色模式 */
-  /* 主题色定义 - 暗色模式 */
-  :root,
-  .theme-blue {
-    --primary-color: #38bdf8;
-  }
+/* 主题色定义 - 暗色模式 */
+html.dark,
+html.dark .theme-blue,
+html.dark.theme-blue {
+  --primary-color: #38bdf8;
+}
 
-  .theme-purple {
-    --primary-color: #a78bfa;
-  }
+html.dark .theme-purple,
+html.dark.theme-purple {
+  --primary-color: #a78bfa;
+}
 
-  .theme-green {
-    --primary-color: #34d399;
-  }
+html.dark .theme-green,
+html.dark.theme-green {
+  --primary-color: #34d399;
+}
 
-  .theme-orange {
-    --primary-color: #fb923c;
-  }
+html.dark .theme-orange,
+html.dark.theme-orange {
+  --primary-color: #fb923c;
+}
 
-  .theme-red {
-    --primary-color: #f87171;
-  }
+html.dark .theme-red,
+html.dark.theme-red {
+  --primary-color: #f87171;
+}
 
-  .theme-pink {
-    --primary-color: #f472b6;
-  }
+html.dark .theme-pink,
+html.dark.theme-pink {
+  --primary-color: #f472b6;
 }
 
 * {
@@ -261,29 +264,24 @@ html:not(.os-windows[data-material='mica']):not(.os-windows[data-material='acryl
   height: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    /* 暗色模式下的计算逻辑 */
-    --primary-hover: color-mix(in srgb, var(--primary-color), white 10%);
-    --primary-light-bg: color-mix(in srgb, var(--primary-color), transparent 92%);
-  }
+html.dark body {
+  --primary-hover: color-mix(in srgb, var(--primary-color), white 10%);
+  --primary-light-bg: color-mix(in srgb, var(--primary-color), transparent 92%);
+}
 
-  /* 暗色模式下默认的 active-bg 和 hover-bg（非 Windows 材质模式） */
-  html:not(.os-windows[data-material='mica']):not(.os-windows[data-material='acrylic']) body {
-    --active-bg: color-mix(in srgb, var(--primary-color) 12%, #303133);
-    --hover-bg: color-mix(in srgb, var(--primary-color) 5%, #303133);
-  }
+html.dark:not(.os-windows[data-material='mica']):not(.os-windows[data-material='acrylic']) body {
+  --active-bg: color-mix(in srgb, var(--primary-color) 12%, #303133);
+  --hover-bg: color-mix(in srgb, var(--primary-color) 5%, #303133);
+}
 
-  /* 暗色模式下的文本选择样式 */
-  ::selection {
-    background: color-mix(in srgb, var(--primary-color) 40%, #303133);
-    color: var(--text-color);
-  }
+html.dark ::selection {
+  background: color-mix(in srgb, var(--primary-color) 40%, #303133);
+  color: var(--text-color);
+}
 
-  ::-moz-selection {
-    background: color-mix(in srgb, var(--primary-color) 40%, #303133);
-    color: var(--text-color);
-  }
+html.dark ::-moz-selection {
+  background: color-mix(in srgb, var(--primary-color) 40%, #303133);
+  color: var(--text-color);
 }
 
 /* ==================== 通用控件样式规范 ==================== */
@@ -620,27 +618,23 @@ html:not(.os-windows[data-material='mica']):not(.os-windows[data-material='acryl
 }
 
 /* 亮色模式：从主题色到极浅主题色的渐变 */
-@media (prefers-color-scheme: light) {
-  .adaptive-icon {
-    background: linear-gradient(
-      135deg,
-      var(--primary-color) 0%,
-      color-mix(in srgb, var(--primary-color) 10%, white) 100%
-    );
-    opacity: 0.88;
-  }
+.adaptive-icon {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    color-mix(in srgb, var(--primary-color) 10%, white) 100%
+  );
+  opacity: 0.88;
 }
 
 /* 暗色模式：从主题色到极浅主题色的渐变 */
-@media (prefers-color-scheme: dark) {
-  .adaptive-icon {
-    background: linear-gradient(
-      135deg,
-      var(--primary-color) 0%,
-      color-mix(in srgb, var(--primary-color) 15%, white) 100%
-    );
-    opacity: 0.92;
-  }
+html.dark .adaptive-icon {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    color-mix(in srgb, var(--primary-color) 15%, white) 100%
+  );
+  opacity: 0.92;
 }
 
 /* 不同主题的色相旋转值 */
@@ -688,31 +682,27 @@ html:not(.os-windows[data-material='mica']):not(.os-windows[data-material='acryl
 }
 
 /* 亮色模式滚动条 */
-@media (prefers-color-scheme: light) {
-  ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.08) !important;
-  }
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.15) !important;
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
 
-  ::-webkit-scrollbar-thumb:active {
-    background: rgba(0, 0, 0, 0.25) !important;
-  }
+::-webkit-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.25) !important;
 }
 
 /* 暗色模式滚动条 */
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1) !important;
-  }
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2) !important;
-  }
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
 
-  ::-webkit-scrollbar-thumb:active {
-    background: rgba(255, 255, 255, 0.35) !important;
-  }
+html.dark ::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.35) !important;
 }

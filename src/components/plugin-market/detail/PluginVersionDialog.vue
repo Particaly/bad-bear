@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import Dropdown from '../../common/Dropdown/Dropdown.vue'
-import type { DropdownOption } from '../../common/Dropdown/Dropdown'
+import { ZButton, ZSelect } from 'ztools-ui'
+import type { SelectOption } from 'ztools-ui'
 import type {
   PluginDetailVersion,
   PluginHashOption,
@@ -63,15 +63,15 @@ const installActionDisabled = computed(() => {
 })
 const installActionText = computed(() => props.installActionText || '安装插件')
 const hasBuildOptions = computed(() => (props.versionOptions?.length || 0) > 0)
-const selectedVersionValue = computed(() => props.selectedVersion || '')
-const selectedHashValue = computed(() => props.selectedHash || '')
-const versionDropdownOptions = computed<DropdownOption[]>(() =>
+const selectedVersionValue = computed(() => props.selectedVersion ?? null)
+const selectedHashValue = computed(() => props.selectedHash ?? null)
+const versionDropdownOptions = computed<SelectOption[]>(() =>
   (props.versionOptions || []).map((option) => ({
     label: option.label,
     value: option.value,
   })),
 )
-const hashDropdownOptions = computed<DropdownOption[]>(() =>
+const hashDropdownOptions = computed<SelectOption[]>(() =>
   (props.hashOptions || []).map((option) => ({
     label: option.label,
     value: option.value,
@@ -85,6 +85,18 @@ function closeVersionModal(): void {
 function handleVersionModalInstall(): void {
   closeVersionModal()
   emit('install')
+}
+
+function handleVersionChange(value: string | number | null): void {
+  if (value !== null) {
+    emit('select-version', value)
+  }
+}
+
+function handleHashChange(value: string | number | null): void {
+  if (value !== null) {
+    emit('select-hash', value)
+  }
 }
 </script>
 
@@ -102,20 +114,20 @@ function handleVersionModalInstall(): void {
         <div class="build-selector-controls">
           <div class="build-selector-field">
             <span class="build-selector-label">版本</span>
-            <Dropdown
+            <ZSelect
               :model-value="selectedVersionValue"
               :options="versionDropdownOptions"
               placeholder="暂无版本"
-              @change="emit('select-version', $event)"
+              @change="handleVersionChange"
             />
           </div>
           <div class="build-selector-field">
             <span class="build-selector-label">构建</span>
-            <Dropdown
+            <ZSelect
               :model-value="selectedHashValue"
               :options="hashDropdownOptions"
               placeholder="暂无构建"
-              @change="emit('select-hash', $event)"
+              @change="handleHashChange"
             />
           </div>
         </div>
@@ -152,16 +164,15 @@ function handleVersionModalInstall(): void {
         </div>
 
         <div class="version-modal-actions">
-          <button class="btn btn-ghost" @click="closeVersionModal">取消</button>
-          <button
-            class="btn"
-            :class="installActionButtonClass"
+          <ZButton @click="closeVersionModal">取消</ZButton>
+          <ZButton
+            :type="installActionButtonClass === 'btn-warning' ? 'warning' : 'primary'"
             :disabled="installActionDisabled"
+            :loading="installActionBusy"
             @click="handleVersionModalInstall"
           >
-            <div v-if="installActionBusy" class="spinner"></div>
-            <span v-else>{{ installActionText }}</span>
-          </button>
+            {{ installActionText }}
+          </ZButton>
         </div>
       </template>
     </div>

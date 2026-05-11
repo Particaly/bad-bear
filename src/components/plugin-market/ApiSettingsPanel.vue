@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { ZButton, ZInput } from 'ztools-ui'
 
 const props = defineProps<{
   baseUrl: string
@@ -34,7 +35,7 @@ function submit(): void {
     <div class="panel-card section-card settings-card">
       <div class="field-group">
         <label class="field-label" for="shop-api-base-url">商店后端地址</label>
-        <input
+        <ZInput
           id="shop-api-base-url"
           v-model="draftBaseUrl"
           class="text-input"
@@ -44,7 +45,7 @@ function submit(): void {
         />
       </div>
       <div class="action-row">
-        <button class="btn btn-primary" @click="submit">保存地址</button>
+        <ZButton type="primary" @click="submit">保存地址</ZButton>
       </div>
     </div>
   </div>

@@ -1,2 +1,1 @@
-export { default as Toast } from './Toast.vue'
-export * from './Toast'
+export { ZToast as Toast, useToast } from 'ztools-ui'

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ZButton } from 'ztools-ui'
 import {
   fetchPluginMarket,
   getCurrentPlatform,
@@ -7,6 +8,7 @@ import {
   getRunningPlugins,
 } from '../../api/pluginMarket'
 import { useToast, Toast as ToastComponent } from '../common/Toast'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type {
   CategoryInfo,
   CategoryLayoutSection,
@@ -70,9 +72,12 @@ function isInternalPlugin(_name: string): boolean {
 
 const {
   toastState,
+  confirmState,
   success: showSuccessToast,
   error: showErrorToast,
   confirm,
+  handleConfirm,
+  handleCancel,
 } = useToast()
 
 function notifyError(message: string) {
@@ -679,6 +684,17 @@ onUnmounted(() => {
       :duration="toastState.duration"
       @update:visible="toastState.visible = $event"
     />
+    <ConfirmDialog
+      :visible="confirmState.visible"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :type="confirmState.type"
+      :confirm-text="confirmState.confirmText"
+      :cancel-text="confirmState.cancelText"
+      @update:visible="confirmState.visible = $event"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
     <aside class="side-nav">
       <div class="side-nav-header">
         <div class="side-nav-title">邪恶的熊</div>
@@ -842,7 +858,7 @@ onUnmounted(() => {
                 </div>
                 <div v-else-if="loadError" class="empty-state">
                   <span>{{ loadError }}</span>
-                  <button class="btn retry-btn" @click="reloadMarket">重试</button>
+                  <ZButton class="retry-btn" @click="reloadMarket">重试</ZButton>
                 </div>
                 <div v-else class="market-grid">
                   <PluginCard

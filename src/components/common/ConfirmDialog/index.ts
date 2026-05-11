@@ -1,1 +1,1 @@
-export { default as ConfirmDialog } from './ConfirmDialog.vue'
+export { ZConfirmDialog as ConfirmDialog, useConfirmDialog } from 'ztools-ui'

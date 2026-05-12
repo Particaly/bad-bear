@@ -1,11 +1,11 @@
-// 已安装插件操作：打开、卸载、重载、打开文件夹
+// 已安装插件操作：打开、卸载、停止、打开文件夹
 
 import type { Ref } from 'vue'
 import {
   deleteInstalledPlugin,
   openInstalledPlugin,
-  reloadInstalledPlugin,
   revealPluginInFinder,
+  stopInstalledPlugin,
 } from '../../../../api/pluginMarket'
 import type { InstalledBusyAction } from '../shared'
 import type { PluginMarketUiPlugin } from '../../../../types/pluginMarket'
@@ -58,12 +58,10 @@ export async function handleUninstall(
     return
   }
 
-  // 检查是否有其他操作正在进行
   if (params.marketBusyPluginName.value || params.installedBusyPluginName.value) {
     return
   }
 
-  // 显示确认对话框
   const confirmed = await params.confirmAction({
     title: '确认卸载',
     message: `确定卸载 ${plugin.title} 吗？`,
@@ -97,6 +95,49 @@ export async function handleUninstall(
 }
 
 /**
+ * 处理停止已运行的插件
+ */
+export async function handleStopPlugin(
+  plugin: PluginMarketUiPlugin,
+  params: {
+    marketBusyPluginName: Ref<string | null>
+    installedBusyPluginName: Ref<string | null>
+    installedBusyAction: Ref<InstalledBusyAction>
+    notifyError: (message: string) => void
+    notifySuccess: (message: string) => void
+    reloadMarket: () => Promise<void>
+  },
+): Promise<void> {
+  if (!plugin.path) {
+    params.notifyError('找不到插件路径，无法停止运行')
+    return
+  }
+
+  if (params.marketBusyPluginName.value || params.installedBusyPluginName.value) {
+    return
+  }
+
+  params.installedBusyPluginName.value = plugin.name
+  params.installedBusyAction.value = 'stop'
+
+  try {
+    const result = await stopInstalledPlugin(plugin.path)
+    if (!result.success) {
+      throw new Error(result.error || '停止运行失败')
+    }
+
+    params.notifySuccess(`已停止 ${plugin.title} 运行`)
+    await params.reloadMarket()
+  } catch (error) {
+    console.error('[PluginMarket] 停止插件失败:', error)
+    params.notifyError(getErrorMessage(error, '停止运行失败'))
+  } finally {
+    params.installedBusyPluginName.value = null
+    params.installedBusyAction.value = null
+  }
+}
+
+/**
  * 处理在 Finder/Explorer 中打开插件文件夹
  */
 export async function handleOpenFolder(
@@ -115,51 +156,5 @@ export async function handleOpenFolder(
   } catch (error) {
     console.error('[PluginMarket] 打开插件目录失败:', error)
     params.notifyError(getErrorMessage(error, '打开插件目录失败'))
-  }
-}
-
-/**
- * 处理重载已安装的插件
- */
-export async function handleReloadPlugin(
-  plugin: PluginMarketUiPlugin,
-  params: {
-    marketBusyPluginName: Ref<string | null>
-    installedBusyPluginName: Ref<string | null>
-    installedBusyAction: Ref<InstalledBusyAction>
-    notifyError: (message: string) => void
-    notifySuccess: (message: string) => void
-    reloadMarket: () => Promise<void>
-    openPluginByName: (name: string) => void
-  },
-): Promise<void> {
-  if (!plugin.path) {
-    params.notifyError('找不到插件路径，无法重载')
-    return
-  }
-
-  // 检查是否有其他操作正在进行
-  if (params.marketBusyPluginName.value || params.installedBusyPluginName.value) {
-    return
-  }
-
-  params.installedBusyPluginName.value = plugin.name
-  params.installedBusyAction.value = 'reload'
-
-  try {
-    const result = await reloadInstalledPlugin(plugin.path)
-    if (!result.success) {
-      throw new Error(result.error || '重载失败')
-    }
-
-    params.notifySuccess(`已重载 ${plugin.title}`)
-    await params.reloadMarket()
-    params.openPluginByName(plugin.name)
-  } catch (error) {
-    console.error('[PluginMarket] 重载插件失败:', error)
-    params.notifyError(getErrorMessage(error, '重载插件失败'))
-  } finally {
-    params.installedBusyPluginName.value = null
-    params.installedBusyAction.value = null
   }
 }

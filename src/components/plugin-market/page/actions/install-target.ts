@@ -37,22 +37,21 @@ export function buildLatestPluginDownloadTarget(
 }
 
 /**
- * 解析插件操作的下载目标
- * 优先选择选中的详情目标（如果可用），否则构建最新目标
+ * 解析插件操作的下载目标。
+ * 当前详情插件使用详情接口返回的默认构建，否则回退到插件列表版本。
  */
 export function resolvePluginTargetForAction(
   plugin: PluginMarketUiPlugin,
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     preferLatest?: boolean
   },
 ): ResolvedPluginDownloadTarget | null {
   const isSelectedDetailPlugin = plugin.name === params.selectedPluginName
-  // 如果不强制最新且是当前选中的详情插件，则使用选中的目标
   if (!params.preferLatest && isSelectedDetailPlugin && params.pluginDetailState.detail) {
-    return params.resolvedSelectedPluginTarget.value
+    return params.currentPluginDownloadTarget.value
   }
 
   const detail = isSelectedDetailPlugin ? params.pluginDetailState.detail : null
@@ -87,9 +86,9 @@ export function buildPluginInstallConfirmation(
 
   const comparison = compareVersions(plugin.localVersion, target.version)
   const actionLabel = comparison < 0 ? '升级' : comparison > 0 ? '降级' : '重装'
-  const title = comparison < 0 ? '确认升级' : comparison > 0 ? '确认安装历史版本' : '确认重装构建'
-  const targetLabel = target.build ? `${target.version}（${target.hash}）` : target.version || '最新版本'
-  const message = `确定将 ${plugin.title} 从 ${plugin.localVersion || '未知版本'}${actionLabel}到 ${targetLabel}吗？安装过程会先删除旧插件，若新构建安装失败，你将暂时失去该插件。`
+  const title = comparison < 0 ? '确认升级' : comparison > 0 ? '确认降级' : '确认重装'
+  const targetLabel = target.version || '最新版本'
+  const message = `确定将 ${plugin.title} 从 ${plugin.localVersion || '未知版本'}${actionLabel}到 ${targetLabel}吗？安装过程会先删除旧插件，若新版本安装失败，你将暂时失去该插件。`
 
   return {
     title,
@@ -107,7 +106,7 @@ export function requirePluginInstallPayload(
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     canInstallFromMarket: boolean
     preferLatest?: boolean
     notifyError: (message: string) => void
@@ -144,7 +143,7 @@ export function requirePluginInstallTargetSummary(
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     preferLatest?: boolean
   },
 ): string {
@@ -157,7 +156,7 @@ export function requirePluginInstallTargetSummary(
     return target.version || '最新版本'
   }
 
-  return params.preferLatest ? target.version || '最新版本' : `${target.version}（${target.hash}）`
+  return target.version || '最新版本'
 }
 
 /**
@@ -168,7 +167,7 @@ export function requirePluginInstallSuccessText(
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     preferLatest?: boolean
   },
 ): string {
@@ -184,7 +183,7 @@ export function requirePluginUpgradeSuccessText(
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
   },
 ): string {
   const target = resolvePluginTargetForAction(plugin, params)
@@ -198,10 +197,10 @@ export function requirePluginUpgradeSuccessText(
   }
 
   if (comparison > 0) {
-    return `已安装 ${plugin.title} 历史版本 ${target.version}`
+    return `已安装 ${plugin.title} ${target.version}`
   }
 
-  return `已安装 ${plugin.title} 所选构建`
+  return `已重装 ${plugin.title} ${target.version}`
 }
 
 /**
@@ -212,7 +211,7 @@ export function requirePluginUpgradeFailureText(
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
   },
 ): string {
   const target = resolvePluginTargetForAction(plugin, params)
@@ -226,8 +225,8 @@ export function requirePluginUpgradeFailureText(
   }
 
   if (comparison > 0) {
-    return '安装历史版本失败'
+    return '安装失败'
   }
 
-  return '安装所选构建失败'
+  return '重装失败'
 }

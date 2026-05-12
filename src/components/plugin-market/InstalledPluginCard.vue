@@ -1,22 +1,25 @@
 <script setup lang="ts">
 import type { InstalledViewPlugin } from '../../types/pluginMarket'
+import type { InstalledBusyAction } from './page/shared'
 
 const props = defineProps<{
   plugin: InstalledViewPlugin
-  isBusy?: boolean
-  shareDisabled?: boolean
-  shareTitle?: string
+  busyAction?: InstalledBusyAction
   isInternal?: boolean
+  canStop?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'click'): void
   (e: 'open'): void
   (e: 'open-folder'): void
-  (e: 'reload'): void
-  (e: 'share'): void
+  (e: 'stop'): void
   (e: 'uninstall'): void
 }>()
+
+function isBusyAction(action: Exclude<InstalledBusyAction, null>): boolean {
+  return props.busyAction === action
+}
 </script>
 
 <template>
@@ -77,13 +80,13 @@ const emit = defineEmits<{
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
       </button>
-      <button class="icon-btn reload-btn" :disabled="isBusy" title="重载插件" @click.stop="emit('reload')">
-        <div v-if="isBusy" class="spinner"></div>
+      <button v-if="plugin.isRunning && canStop" class="icon-btn stop-btn" :disabled="!!busyAction" title="停止运行" @click.stop="emit('stop')">
+        <div v-if="isBusyAction('stop')" class="spinner"></div>
         <svg
           v-else
           xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -91,38 +94,10 @@ const emit = defineEmits<{
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <polyline points="1 20 1 14 7 14"></polyline>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          <rect x="4" y="4" width="16" height="16" rx="2"></rect>
         </svg>
       </button>
-      <button
-        class="icon-btn share-btn"
-        :disabled="isBusy || shareDisabled"
-        :title="isInternal ? '内置插件，不可分享' : shareTitle || '分享插件'"
-        @click.stop="emit('share')"
-      >
-        <div v-if="isBusy" class="spinner"></div>
-        <svg
-          v-else
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-        </svg>
-      </button>
-      <button class="icon-btn delete-btn" :disabled="isBusy || isInternal" :title="isInternal ? '内置插件，不可卸载' : '卸载插件'" @click.stop="emit('uninstall')">
+      <button class="icon-btn delete-btn" :disabled="!!busyAction || isInternal" :title="isInternal ? '内置插件，不可卸载' : '卸载插件'" @click.stop="emit('uninstall')">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="14"
@@ -266,17 +241,21 @@ const emit = defineEmits<{
 }
 
 .open-btn,
-.folder-btn,
-.reload-btn,
-.share-btn {
+.folder-btn {
   color: var(--primary-color);
 }
 
 .open-btn:hover:not(:disabled),
-.folder-btn:hover:not(:disabled),
-.reload-btn:hover:not(:disabled),
-.share-btn:hover:not(:disabled) {
+.folder-btn:hover:not(:disabled) {
   background: var(--primary-light-bg);
+}
+
+.stop-btn {
+  color: var(--warning-color);
+}
+
+.stop-btn:hover:not(:disabled) {
+  background: var(--warning-light-bg);
 }
 
 .delete-btn {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ZButton, ZInput } from 'ztools-ui'
+import { ZButton, ZInput, ZModal } from 'ztools-ui'
 import type {
   AuthUser,
   GitHubBindingState,
@@ -357,6 +357,12 @@ function closeAvatarModal(): void {
   isAvatarModalOpen.value = false
 }
 
+function handleGithubDeviceFlowModalShowUpdate(value: boolean): void {
+  if (!value) {
+    emit('github-cancel-device-flow')
+  }
+}
+
 function handleAvatarChange(event: Event): void {
   const target = event.target as HTMLInputElement | null
   const file = target?.files?.[0]
@@ -373,68 +379,46 @@ function handleAvatarChange(event: Event): void {
 
 <template>
   <div class="account-panel">
-    <div class="panel-card panel-hero">
-      <div class="panel-hero-copy">
-        <h2 class="panel-title">账号与资料</h2>
-      </div>
-      <div v-if="!currentUser" class="auth-tabs" :style="{ '--auth-slider-index': authMode === 'login' ? '0' : '1' }">
-        <div class="auth-tab-slider" aria-hidden="true"></div>
-        <div
-          class="auth-tab"
-          :class="{ active: authMode === 'login' }"
-          :disabled="busy"
-          @click="authMode = 'login'"
-        >
-          登录
-        </div>
-        <div
-          class="auth-tab"
-          :class="{ active: authMode === 'register' }"
-          :disabled="busy"
-          @click="authMode = 'register'"
-        >
-          注册
-        </div>
-      </div>
-    </div>
-
-    <Teleport to="body">
-      <div v-if="githubDeviceFlow.phase !== 'idle'" class="dialog-mask" @click.self="emit('github-cancel-device-flow')">
-        <div class="dialog-card dialog-card--github card">
-          <div class="dialog-header">
-            <div>
-              <h3 class="dialog-title">{{ githubFlowTitle }}</h3>
-              <p class="dialog-description">{{ githubFlowDescription }}</p>
-            </div>
-          </div>
-
-          <div class="github-code-box">{{ githubDeviceFlow.userCode || '---- ----' }}</div>
-
-          <div class="github-flow-meta">
-            <div><span>授权地址</span><span>{{ githubVerificationUrl || '-' }}</span></div>
-            <div><span>过期时间</span><span>{{ githubVerificationExpiresText }}</span></div>
-          </div>
-
-          <div class="github-flow-status">{{ githubFlowStatusText }}</div>
-
-          <div class="action-row github-flow-actions">
-            <ZButton type="primary" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
-              打开 GitHub 授权页
-            </ZButton>
-            <ZButton
-              v-if="githubDeviceFlow.phase === 'error' || githubDeviceFlow.phase === 'expired'"
-              :disabled="busy"
-              @click="githubDeviceFlow.purpose === 'bind' ? emit('github-bind') : emit('github-login')"
-            >
-              重新发起
-            </ZButton>
-            <ZButton @click="emit('github-cancel-device-flow')">
-              取消
-            </ZButton>
+    <ZModal
+      :show="githubDeviceFlow.phase !== 'idle'"
+      to="body"
+      :mask-closable="true"
+      @update:show="handleGithubDeviceFlowModalShowUpdate"
+    >
+      <div class="dialog-card dialog-card--github">
+        <div class="dialog-header">
+          <div>
+            <h3 class="dialog-title">{{ githubFlowTitle }}</h3>
+            <p class="dialog-description">{{ githubFlowDescription }}</p>
           </div>
         </div>
+
+        <div class="github-code-box">{{ githubDeviceFlow.userCode || '---- ----' }}</div>
+
+        <div class="github-flow-meta">
+          <div><span>授权地址</span><span>{{ githubVerificationUrl || '-' }}</span></div>
+          <div><span>过期时间</span><span>{{ githubVerificationExpiresText }}</span></div>
+        </div>
+
+        <div class="github-flow-status">{{ githubFlowStatusText }}</div>
+
+        <div class="action-row github-flow-actions">
+          <ZButton type="primary" :disabled="!githubVerificationUrl" @click="emit('github-open-verification')">
+            打开 GitHub 授权页
+          </ZButton>
+          <ZButton
+            v-if="githubDeviceFlow.phase === 'error' || githubDeviceFlow.phase === 'expired'"
+            :disabled="busy"
+            @click="githubDeviceFlow.purpose === 'bind' ? emit('github-bind') : emit('github-login')"
+          >
+            重新发起
+          </ZButton>
+          <ZButton @click="emit('github-cancel-device-flow')">
+            取消
+          </ZButton>
+        </div>
       </div>
-    </Teleport>
+    </ZModal>
 
     <template v-if="currentUser">
       <div class="panel-card profile-card">
@@ -621,6 +605,26 @@ function handleAvatarChange(event: Event): void {
 
     <template v-else>
       <div class="panel-card auth-card">
+        <div class="auth-tabs" :style="{ '--auth-slider-index': authMode === 'login' ? '0' : '1' }">
+          <div class="auth-tab-slider" aria-hidden="true"></div>
+          <div
+            class="auth-tab"
+            :class="{ active: authMode === 'login' }"
+            :disabled="busy"
+            @click="authMode = 'login'"
+          >
+            登录
+          </div>
+          <div
+            class="auth-tab"
+            :class="{ active: authMode === 'register' }"
+            :disabled="busy"
+            @click="authMode = 'register'"
+          >
+            注册
+          </div>
+        </div>
+
         <div v-if="isRestoringSession" class="auth-status">正在恢复登录状态...</div>
 
         <template v-if="authMode === 'login'">
@@ -788,32 +792,12 @@ function handleAvatarChange(event: Event): void {
   background: var(--card-bg);
   backdrop-filter: blur(40px) saturate(180%);
 }
-
-.panel-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  height: 74px;
-}
-
-.panel-hero-copy {
-  flex: 1;
-  min-width: 0;
-}
-
 .panel-eyebrow {
   display: inline-flex;
   margin-bottom: 8px;
   color: var(--primary-color);
   font-size: 12px;
   font-weight: 700;
-}
-
-.panel-title {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-color);
 }
 
 .panel-description {
@@ -1267,7 +1251,7 @@ function handleAvatarChange(event: Event): void {
 }
 
 .dialog-card--github {
-  width: min(480px, 88%);
+  width: min(480px, 88vw);
 }
 
 .dialog-header {

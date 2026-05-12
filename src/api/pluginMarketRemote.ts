@@ -14,7 +14,6 @@ import type {
   PluginCommentRecord,
   PluginCommentsPage,
   PluginDetailResponse,
-  PluginDetailVersion,
   PluginHashCheckResponse,
   PluginMarketCategoryDto,
   PluginMarketFetchResponse,
@@ -25,11 +24,9 @@ import type {
   PluginRatingsPage,
   PluginRiskInfo,
   PluginStatsResponse,
-  PublicProviderRecord,
   PluginUploadAcceptedResponse,
   PluginUploadPayload,
   PluginUploadResponse,
-  PluginVersionBuildsResponse,
 } from '../types/pluginMarket'
 
 const PLUGIN_MARKET_CACHE_KEY = 'bad-bear.plugin-market.cache.v1'
@@ -232,29 +229,10 @@ export function getPluginRisk(name: string, version?: string | null): Promise<Pl
   })
 }
 
-export async function getPluginVersionBuilds(
-  name: string,
-  version: string,
-): Promise<PluginVersionBuildsResponse> {
-  const pluginName = encodeURIComponent(name)
-  const pluginVersion = encodeURIComponent(version)
-  const response = await requestJson<PluginDetailVersion[] | PluginVersionBuildsResponse>({
-    path: `/api/v1/plugins/${pluginName}/${pluginVersion}/versions`,
-  })
-
-  return Array.isArray(response) ? { items: response } : { items: response.items || [] }
-}
-
 export function getPluginStats(name: string): Promise<PluginStatsResponse> {
   const pluginName = encodeURIComponent(name)
   return requestJson<PluginStatsResponse>({
     path: `/api/v1/plugins/${pluginName}/stats`,
-  })
-}
-
-export function getPublicProviderById(id: string): Promise<PublicProviderRecord> {
-  return requestJson<PublicProviderRecord>({
-    path: `/api/v1/providers/${encodeURIComponent(id)}`,
   })
 }
 

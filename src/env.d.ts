@@ -78,6 +78,7 @@ interface ZToolsInternal {
   launch?(options: PluginLaunchOptions): Promise<PluginLaunchResult | void>
   getRunningPlugins?(): Promise<string[]>
   reloadPlugin?(pluginPath: string): Promise<OperationResult>
+  killPlugin?(pluginPath: string): Promise<OperationResult>
   revealInFinder?(targetPath: string): Promise<void>
   packagePlugin?(pluginPath: string): Promise<PluginPackageResult>
   computeFileHash?(filePath: string, algorithm?: 'sha256'): Promise<HashFileResult>

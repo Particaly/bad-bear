@@ -269,15 +269,6 @@ export interface CategoryInfo {
 
 export type PluginReleaseSource = string | Record<string, unknown> | null
 
-export interface PublicProviderRecord {
-  id: string
-  name?: string
-  title?: string
-  label?: string
-  publicName?: string
-  [key: string]: unknown
-}
-
 export interface PluginDetailReadme {
   hash?: string | null
   content?: string | null
@@ -298,29 +289,10 @@ export interface PluginDetailVersion {
   uploaderUsername?: string | null
 }
 
-export interface PluginVersionOption {
-  label: string
-  value: string
-  buildCount: number
-}
-
-export interface PluginHashOption {
-  label: string
-  value: string
-  hash: string
-  fileSize: number
-  downloads: number
-  createdAt: string
-  source?: PluginReleaseSource
-  uploaderUserId?: string | null
-  uploaderAccount?: string | null
-  uploaderUsername?: string | null
-}
-
 export interface ResolvedPluginDownloadTarget {
   version: string
   hash: string | null
-  downloadMode: 'latest' | 'version' | 'hash'
+  downloadMode: 'latest' | 'hash'
   downloadUrl: string
   build: PluginDetailVersion | null
   plugin: PluginMarketPlugin
@@ -363,10 +335,6 @@ export interface PluginRiskInfo {
   riskSummary: PluginRiskSummary | null
   reviewDecision?: string | null
   updatedAt: string
-}
-
-export interface PluginVersionBuildsResponse {
-  items: PluginDetailVersion[]
 }
 
 export interface PluginStatsResponse {

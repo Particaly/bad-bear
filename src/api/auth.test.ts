@@ -1,19 +1,84 @@
-import { describe, expect, it } from 'vitest'
-import { buildGithubWebLoginUrl } from './auth'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getCaptcha, pollGithubDeviceLogin, startGithubDeviceLogin } from './auth'
+import { DEFAULT_SHOP_API_BASE_URL, saveShopApiRuntimeConfig } from '../config/runtimeConfig'
 
-describe('buildGithubWebLoginUrl', () => {
-  it('builds the GitHub web login url with redirect and frontend origin', () => {
-    const url = buildGithubWebLoginUrl({
-      redirect: '/user/upload?from=market',
-      frontendOrigin: 'http://localhost:5173',
+type FetchMock = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+const originalFetch = globalThis.fetch
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+describe('auth api', () => {
+  beforeEach(() => {
+    saveShopApiRuntimeConfig({
+      baseUrl: DEFAULT_SHOP_API_BASE_URL,
+      token: '',
+      currentUser: null,
     })
-
-    expect(url).toBe(
-      '/api/v1/auth/github/web/start?redirect=%2Fuser%2Fupload%3Ffrom%3Dmarket&frontendOrigin=http%3A%2F%2Flocalhost%3A5173',
-    )
+    globalThis.fetch = originalFetch
   })
 
-  it('omits empty parameters', () => {
-    expect(buildGithubWebLoginUrl()).toBe('/api/v1/auth/github/web/start')
+  afterAll(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  it('requests captcha with encoded bgColor query', async () => {
+    const fetchMock = vi.fn<FetchMock>(async () => jsonResponse({ image: 'captcha-image', key: 'captcha-key' }))
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await getCaptcha('#fff 000')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [input, init] = fetchMock.mock.calls[0]!
+    expect(String(input)).toBe('https://badbear.ydys.cc/api/v1/auth/captcha?bgColor=%23fff%20000')
+    expect(init?.method ?? 'GET').toBe('GET')
+  })
+
+  it('starts GitHub device login with POST', async () => {
+    const fetchMock = vi.fn<FetchMock>(async () =>
+      jsonResponse({
+        deviceSessionId: 'session-1',
+        userCode: 'ABCD-EFGH',
+        verificationUri: 'https://github.com/login/device',
+        verificationUriComplete: 'https://github.com/login/device?user_code=ABCD-EFGH',
+        expiresAt: '2026-05-12T01:23:45.000Z',
+        expiresIn: 900,
+        interval: 5,
+      }),
+    )
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await startGithubDeviceLogin()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [input, init] = fetchMock.mock.calls[0]!
+    expect(String(input)).toBe('https://badbear.ydys.cc/api/v1/auth/github/device/start')
+    expect(init?.method).toBe('POST')
+  })
+
+  it('polls GitHub device login with JSON body', async () => {
+    const fetchMock = vi.fn<FetchMock>(async () =>
+      jsonResponse({
+        status: 'pending',
+        retryAfterSeconds: 5,
+        expiresAt: '2026-05-12T01:23:45.000Z',
+      }),
+    )
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await pollGithubDeviceLogin({ deviceSessionId: 'session-1' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [input, init] = fetchMock.mock.calls[0]!
+    expect(String(input)).toBe('https://badbear.ydys.cc/api/v1/auth/github/device/poll')
+    expect(init?.method).toBe('POST')
+    expect(new Headers(init?.headers).get('content-type')).toBe('application/json')
+    expect(init?.body).toBe(JSON.stringify({ deviceSessionId: 'session-1' }))
   })
 })
+

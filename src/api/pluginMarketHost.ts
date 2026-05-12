@@ -81,6 +81,15 @@ export async function reloadInstalledPlugin(pluginPath: string): Promise<Operati
   return reloadPlugin(pluginPath)
 }
 
+export async function stopInstalledPlugin(pluginPath: string): Promise<OperationResult> {
+  const killPlugin = window.ztools.internal.killPlugin
+  if (!killPlugin) {
+    throw new Error('当前宿主未暴露 killPlugin 能力')
+  }
+
+  return killPlugin(pluginPath)
+}
+
 export async function revealPluginInFinder(pluginPath: string): Promise<void> {
   const revealInFinder = window.ztools.internal.revealInFinder
   if (!revealInFinder) {

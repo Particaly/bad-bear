@@ -28,13 +28,9 @@ export {
 // 插件详情解析辅助函数
 export {
   mergePluginDetailIntoPlugin,
-  buildPluginVersionOptions,
-  buildPluginHashOptions,
-  resolveSelectedVersion,
-  resolveSelectedHash,
   parsePluginSourceReference,
   mapPluginSourceLabel,
-  buildResolvedPluginDownloadTarget,
+  buildCurrentPluginDownloadTarget,
 } from './plugin-detail'
 
 // 评论树辅助函数

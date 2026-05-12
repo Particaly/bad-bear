@@ -29,7 +29,7 @@ export async function openPluginDownload(
   params: {
     selectedPluginName: string | null
     pluginDetailState: { detail: PluginDetailResponse | null }
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     preferLatest?: boolean
     notifyError: (message: string) => void
     notifySuccess: (message: string) => void
@@ -63,7 +63,7 @@ export async function handleInstall(
     canInstallFromMarket: boolean
     selectedPluginName: string | null
     pluginDetailState: PluginDetailState
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     marketBusyPluginName: Ref<string | null>
     marketBusyAction: Ref<MarketBusyAction>
     installedBusyPluginName: Ref<string | null>
@@ -128,7 +128,7 @@ export async function handleInstallLatest(
     canInstallFromMarket: boolean
     selectedPluginName: string | null
     pluginDetailState: PluginDetailState
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     marketBusyPluginName: Ref<string | null>
     marketBusyAction: Ref<MarketBusyAction>
     installedBusyPluginName: Ref<string | null>
@@ -150,7 +150,7 @@ export async function handleUpgrade(
   params: {
     selectedPluginName: string | null
     pluginDetailState: PluginDetailState
-    resolvedSelectedPluginTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
+    currentPluginDownloadTarget: ComputedRef<ResolvedPluginDownloadTarget | null>
     marketBusyPluginName: Ref<string | null>
     marketBusyAction: Ref<MarketBusyAction>
     installedBusyPluginName: Ref<string | null>

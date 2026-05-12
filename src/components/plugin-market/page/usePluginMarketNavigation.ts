@@ -29,6 +29,7 @@ export function usePluginMarketNavigation(options: {
       return
     }
 
+    options.selectedPluginName.value = null
     options.activeNav.value = nav
   }
 

@@ -14,6 +14,7 @@ import type {
   CategoryLayoutSection,
   InstalledPlugin,
   InstalledViewPlugin,
+  PluginDetailVersion,
   PluginMarketFetchResponse,
   PluginMarketSectionModel,
   PluginMarketUiPlugin,
@@ -261,6 +262,7 @@ const installedPluginMap = computed(
   () => new Map(installedViewPlugins.value.map((plugin) => [plugin.name, plugin])),
 )
 const canInstallFromMarket = computed(() => canUseInternalPluginApis.value)
+const canStopPlugins = computed(() => typeof window.ztools?.internal?.killPlugin === 'function')
 
 const hasStorefront = computed(() => storefrontSections.value.length > 0)
 const filteredPlugins = computed(() =>
@@ -278,7 +280,6 @@ const detail = usePluginMarketDetail({
   selectedPlugin,
   selectedPluginName,
   currentUser,
-  canInstallFromMarket,
   requireShopLogin,
   notifyError,
   notifySuccess,
@@ -290,20 +291,14 @@ const {
   pluginCommentTree,
   hasMorePluginComments,
   selectedSourceLabel,
-  selectedBuildSourceLabel,
-  pluginVersionOptions,
-  selectedVersionHashOptions,
-  selectedPluginBuild,
-  resolvedSelectedPluginTarget,
+  currentPluginDownloadTarget,
   mergedSelectedPlugin,
-  selectedPluginActionText,
+  selectPluginDetailVersion,
   resetPluginDetailState,
   reloadSelectedPluginDetail,
   handleLoadMorePluginComments,
   handleSubmitPluginRating,
   handleSubmitPluginComment,
-  selectPluginDetailVersion,
-  selectPluginDetailHash,
 } = detail
 
 reloadSelectedPluginDetailRef = reloadSelectedPluginDetail
@@ -311,33 +306,29 @@ reloadSelectedPluginDetailRef = reloadSelectedPluginDetail
 const actions = usePluginMarketActions({
   selectedPluginName,
   pluginDetailState,
-  resolvedSelectedPluginTarget,
+  currentPluginDownloadTarget,
   canUseInternalPluginApis,
   notifyError,
   notifySuccess,
-  requireShopLogin,
   confirmAction,
   reloadMarket: () => reloadMarket(),
   openPluginByName,
   closePlugin,
-  isInternalPlugin,
 })
 
 const {
   marketBusyPluginName,
   installedBusyPluginName,
+  installedBusyAction,
   selectedPluginBusyAction,
   canUpgrade,
-  isShareDisabledForPlugin,
-  getShareTitleForPlugin: buildShareTitle,
   handleOpenPlugin,
   handleInstall,
   handleInstallLatest,
   handleUpgrade,
   handleUninstall,
+  handleStopPlugin,
   handleOpenFolder,
-  handleReloadPlugin,
-  handleSharePlugin,
 } = actions
 
 const notifications = usePluginMarketNotifications({
@@ -470,6 +461,24 @@ function openPlugin(plugin: PluginMarketUiPlugin) {
   navOpenPlugin(plugin.name)
 }
 
+function handleSelectPluginDetailVersion(version: PluginDetailVersion): void {
+  selectPluginDetailVersion(version)
+}
+
+function handleInstallPluginDetailVersion(version: PluginDetailVersion): void {
+  selectPluginDetailVersion(version)
+  if (!mergedSelectedPlugin.value) {
+    return
+  }
+
+  if (mergedSelectedPlugin.value.installed) {
+    void handleUpgrade(mergedSelectedPlugin.value)
+    return
+  }
+
+  void handleInstall(mergedSelectedPlugin.value)
+}
+
 const notificationBadgeText = computed(() => {
   if (!currentUser.value) {
     return undefined
@@ -517,22 +526,6 @@ const sideNavItems = computed<SideNavItem[]>(() => {
 
   return items.filter((item) => item.visible !== false)
 })
-
-function isShareUnavailableForPlugin(pluginName: string): boolean {
-  if (isShareDisabledForPlugin(pluginName)) {
-    return true
-  }
-
-  return !currentUser.value
-}
-
-function getShareTitleForPlugin(pluginName: string): string {
-  return buildShareTitle({
-    pluginName,
-    isInternal: isInternalPlugin(pluginName),
-    isLoggedIn: !!currentUser.value,
-  })
-}
 
 function handleBannerClick(item: { image: string; url?: string }) {
   if (item.url && typeof window.ztools?.shellOpenExternal === 'function') {
@@ -896,15 +889,13 @@ onUnmounted(() => {
                   v-for="plugin in installedViewPlugins"
                   :key="plugin.path"
                   :plugin="plugin"
-                  :is-busy="installedBusyPluginName === plugin.name"
-                  :share-disabled="isShareUnavailableForPlugin(plugin.name)"
-                  :share-title="getShareTitleForPlugin(plugin.name)"
+                  :busy-action="installedBusyPluginName === plugin.name ? installedBusyAction : null"
                   :is-internal="isInternalPlugin(plugin.name)"
+                  :can-stop="canStopPlugins"
                   @click="openPlugin(plugin)"
                   @open="handleOpenPlugin(plugin)"
                   @open-folder="handleOpenFolder(plugin)"
-                  @reload="handleReloadPlugin(plugin)"
-                  @share="handleSharePlugin(plugin)"
+                  @stop="handleStopPlugin(plugin)"
                   @uninstall="handleUninstall(plugin)"
                 />
               </div>
@@ -1024,9 +1015,8 @@ onUnmounted(() => {
             v-if="mergedSelectedPlugin"
             :plugin="mergedSelectedPlugin"
             :busy-action="selectedPluginBusyAction"
-            :share-disabled="isShareUnavailableForPlugin(mergedSelectedPlugin.name)"
-            :share-title="getShareTitleForPlugin(mergedSelectedPlugin.name)"
             :is-running="!!mergedSelectedPlugin.isRunning"
+            :can-stop="canStopPlugins"
             :is-logged-in="!!currentUser"
             :is-internal="isInternalPlugin(mergedSelectedPlugin.name)"
             :can-install-from-market="canInstallFromMarket"
@@ -1042,32 +1032,27 @@ onUnmounted(() => {
             :comment-submitting="pluginDetailState.commentSubmitting"
             :current-user-avatar-url="currentUserAvatarUrl"
             :comment-submit-success-key="pluginCommentSubmitSuccessKey"
-            :version-options="pluginVersionOptions"
-            :hash-options="selectedVersionHashOptions"
+            :versions="pluginDetailState.detail?.versions || []"
             :selected-version="pluginDetailState.selectedVersion"
             :selected-hash="pluginDetailState.selectedHash"
-            :selected-build="selectedPluginBuild"
             :remote-readme="pluginDetailState.detail?.readme ?? null"
             :source-label="selectedSourceLabel"
-            :build-source-label="selectedBuildSourceLabel"
             :risk="pluginDetailState.risk"
             :risk-loading="pluginDetailState.riskLoading"
             :risk-error="pluginDetailState.riskError"
-            :install-action-text="selectedPluginActionText"
             @back="closePlugin"
             @open="handleOpenPlugin(mergedSelectedPlugin)"
             @download="handleInstall(mergedSelectedPlugin)"
             @install-latest="handleInstallLatest(mergedSelectedPlugin)"
             @upgrade="handleUpgrade(mergedSelectedPlugin)"
             @uninstall="handleUninstall(mergedSelectedPlugin)"
-            @share="handleSharePlugin(mergedSelectedPlugin)"
             @open-folder="handleOpenFolder(mergedSelectedPlugin)"
-            @reload="handleReloadPlugin(mergedSelectedPlugin)"
+            @stop="handleStopPlugin(mergedSelectedPlugin)"
+            @select-version="handleSelectPluginDetailVersion"
+            @install-version="handleInstallPluginDetailVersion"
             @submit-rating="handleSubmitPluginRating"
             @submit-comment="handleSubmitPluginComment"
             @load-more-comments="handleLoadMorePluginComments"
-            @select-version="selectPluginDetailVersion"
-            @select-hash="selectPluginDetailHash"
           />
         </Transition>
       </div>

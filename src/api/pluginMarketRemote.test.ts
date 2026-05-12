@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SHOP_API_BASE_URL, saveShopApiRuntimeConfig } from '../config/runtimeConfig'
-import { fetchPluginMarket, getPluginRisk, getPluginVersionBuilds, getPublicProviderById } from './pluginMarketRemote'
+import { fetchPluginMarket, getPluginRisk } from './pluginMarketRemote'
 
 const originalFetch = globalThis.fetch
 
@@ -266,50 +266,6 @@ describe('fetchPluginMarket', () => {
       'https://badbear.ydys.cc/api/v1/plugins/demo-plugin/risk?version=2.0.0',
       expect.anything(),
     )
-  })
-
-  it('normalizes plugin version builds array responses', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.endsWith('/api/v1/plugins/demo-plugin/2.0.0/versions')) {
-        return jsonResponse([
-          {
-            id: '1',
-            version: '2.0.0',
-            hash: 'abc123',
-            fileSize: 1024,
-            downloads: 10,
-            createdAt: '2026-04-01T00:00:00Z',
-          },
-        ])
-      }
-
-      throw new Error(`Unexpected request: ${url}`)
-    })
-
-    globalThis.fetch = fetchMock as typeof fetch
-
-    const response = await getPluginVersionBuilds('demo-plugin', '2.0.0')
-
-    expect(response.items).toHaveLength(1)
-    expect(response.items[0].hash).toBe('abc123')
-  })
-
-  it('fetches public provider details by id', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.endsWith('/api/v1/providers/provider-1')) {
-        return jsonResponse({ id: 'provider-1', publicName: 'NPM 官方源' })
-      }
-
-      throw new Error(`Unexpected request: ${url}`)
-    })
-
-    globalThis.fetch = fetchMock as typeof fetch
-
-    const provider = await getPublicProviderById('provider-1')
-
-    expect(provider.publicName).toBe('NPM 官方源')
   })
 })
 

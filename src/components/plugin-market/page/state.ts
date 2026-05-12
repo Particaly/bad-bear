@@ -5,13 +5,12 @@ export type ActiveNav = 'store' | 'installed' | 'notifications' | 'upload' | 'ac
 // 市场插件正在执行的操作类型
 export type MarketBusyAction = 'download' | 'upgrade' | null
 // 已安装插件正在执行的操作类型
-export type InstalledBusyAction = 'reload' | 'share' | 'uninstall' | null
+export type InstalledBusyAction = 'stop' | 'uninstall' | null
 
 import type {
   PluginCommentRecord,
   PluginRatingRecord,
   PluginRiskInfo,
-  PublicProviderRecord,
 } from '../../../types/pluginMarket'
 
 // 插件评论分页大小
@@ -21,13 +20,11 @@ export const NOTIFICATIONS_PAGE_SIZE = 20
 
 export interface PluginDetailState {
   detail: import('../../../types/pluginMarket').PluginDetailResponse | null
-  selectedVersion: string | null
-  selectedHash: string | null
   risk: PluginRiskInfo | null
   riskLoading: boolean
   riskError: string
-  sourceProvider: PublicProviderRecord | null
-  buildSourceProvider: PublicProviderRecord | null
+  selectedVersion: string | null
+  selectedHash: string | null
   comments: PluginCommentRecord[]
   currentUserRating: PluginRatingRecord | null
   commentPage: number
@@ -60,13 +57,11 @@ export interface NotificationState {
 export function createEmptyPluginDetailState(): PluginDetailState {
   return {
     detail: null,
-    selectedVersion: null,
-    selectedHash: null,
     risk: null,
     riskLoading: false,
     riskError: '',
-    sourceProvider: null,
-    buildSourceProvider: null,
+    selectedVersion: null,
+    selectedHash: null,
     comments: [],
     currentUserRating: null,
     commentPage: 1,

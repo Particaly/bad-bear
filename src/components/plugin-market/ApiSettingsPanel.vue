@@ -26,12 +26,6 @@ function submit(): void {
 
 <template>
   <div class="settings-panel">
-    <div class="panel-card panel-hero">
-      <div class="panel-hero-copy">
-        <h2 class="panel-title">设置</h2>
-      </div>
-    </div>
-
     <div class="panel-card section-card settings-card">
       <div class="field-group">
         <label class="field-label" for="shop-api-base-url">商店后端地址</label>
@@ -64,25 +58,6 @@ function submit(): void {
   border-radius: 8px;
   background: var(--card-bg);
   backdrop-filter: blur(40px) saturate(180%);
-}
-
-.panel-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  height: 74px;
-}
-
-.panel-hero-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.panel-title {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-color);
 }
 
 .section-card {

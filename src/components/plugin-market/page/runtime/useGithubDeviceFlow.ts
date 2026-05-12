@@ -2,7 +2,6 @@
 
 import { computed, ref, type Ref } from 'vue'
 import {
-  buildGithubWebLoginUrl,
   getGithubBindingStatus,
   pollGithubDeviceBind,
   pollGithubDeviceLogin,
@@ -403,13 +402,6 @@ export function useGithubDeviceFlow(options: {
    * 处理 GitHub 登录流程启动
    */
   async function handleGithubLogin(): Promise<void> {
-    if (typeof window !== 'undefined' && typeof window.location?.assign === 'function') {
-      const redirect = `${window.location.pathname}${window.location.search}`
-      const frontendOrigin = window.location.origin
-      window.location.assign(buildGithubWebLoginUrl({ redirect, frontendOrigin }))
-      return
-    }
-
     await startGithubDeviceFlow('login')
   }
 

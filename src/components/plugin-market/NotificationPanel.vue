@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ZButton, ZPagination } from 'ztools-ui'
+import { ZButton, ZModal, ZPagination, ZTag } from 'ztools-ui'
 import type { AuthUser } from '../../types/auth'
 import type {
   NotificationFilter,
@@ -65,8 +65,12 @@ function getStatusText(status: NotificationStatus): string {
   return status === 'UNREAD' ? '未读' : '已读'
 }
 
-function getTypeLabel(type: string): string {
-  return type || '通知'
+function getStatusTagType(status: NotificationStatus): 'warning' | 'success' {
+  return status === 'UNREAD' ? 'warning' : 'success'
+}
+
+function getReadingTagType(id: string, status: NotificationStatus): 'warning' | 'success' | 'info' {
+  return isReading(id) ? 'info' : getStatusTagType(status)
 }
 
 function isReading(id: string): boolean {
@@ -92,26 +96,6 @@ function closeDetail(): void {
 
 <template>
   <div class="notification-panel">
-    <div class="panel-card panel-hero ">
-      <div class="panel-hero-copy">
-        <h2 class="panel-title">通知中心</h2>
-      </div>
-
-      <div class="hero-actions">
-        <ZButton :disabled="loading" @click="emit('refresh')">
-          刷新
-        </ZButton>
-        <ZButton
-          type="primary"
-          :disabled="!canMarkAllRead"
-          :loading="markingAllRead"
-          @click="emit('mark-all-read')"
-        >
-          全部已读
-        </ZButton>
-      </div>
-    </div>
-
     <template v-if="!currentUser">
       <div class="panel-card section-card empty-card">
         <h3 class="section-title">登录后查看通知</h3>
@@ -136,7 +120,14 @@ function closeDetail(): void {
               {{ option.label }}
             </button>
           </div>
-          <div class="toolbar-meta">第 {{ page }} / {{ totalPages }} 页</div>
+          <ZButton
+            type="primary"
+            :disabled="!canMarkAllRead"
+            :loading="markingAllRead"
+            @click="emit('mark-all-read')"
+          >
+            全部已读
+          </ZButton>
         </div>
 
         <div v-if="loading" class="loading-container">
@@ -214,35 +205,34 @@ function closeDetail(): void {
           </div>
         </div>
 
-        <Teleport to="body">
-          <div v-if="props.selectedItem" class="notification-modal-mask" @click.self="closeDetail">
-            <div class="notification-modal card" role="dialog" aria-modal="true" aria-label="通知详情">
-              <div class="notification-modal-header">
-                <div>
-                  <div class="detail-label">通知详情</div>
-                  <h3 class="notification-modal-title">{{ props.selectedItem.title || '未命名通知' }}</h3>
-                </div>
-                <button class="notification-modal-close" type="button" @click="closeDetail">×</button>
-              </div>
-              <div class="notification-modal-meta">
-                <span>{{ formatDateTime(props.selectedItem.createdAt) }}</span>
-                <span>{{ getTypeLabel(props.selectedItem.type) }}</span>
-                <span
-                  class="status-badge"
-                  :class="{
-                    'is-unread': props.selectedItem.status === 'UNREAD',
-                    'is-reading': isReading(props.selectedItem.id),
-                  }"
+        <ZModal
+          :show="!!props.selectedItem"
+          to="body"
+          :mask-closable="true"
+          @update:show="value => !value && closeDetail()"
+        >
+          <div v-if="props.selectedItem" class="notification-modal card" role="dialog" aria-modal="true" aria-label="通知详情">
+            <div class="notification-modal-header">
+              <div class="notification-modal-title-row">
+                <h3 class="notification-modal-title">{{ props.selectedItem.title || '未命名通知' }}</h3>
+                <ZTag
+                  size="small"
+                  round
+                  :type="getReadingTagType(props.selectedItem.id, props.selectedItem.status)"
                 >
                   {{ isReading(props.selectedItem.id) ? '标记中...' : getStatusText(props.selectedItem.status) }}
-                </span>
+                </ZTag>
+                <ZTag size="small" round type="info">
+                  {{ formatDateTime(props.selectedItem.createdAt) }}
+                </ZTag>
               </div>
-              <div class="detail-content notification-modal-content">
-                {{ props.selectedItem.message || '暂无内容' }}
-              </div>
+              <button class="notification-modal-close" type="button" @click="closeDetail">×</button>
+            </div>
+            <div class="detail-content notification-modal-content">
+              {{ props.selectedItem.message || '暂无内容' }}
             </div>
           </div>
-        </Teleport>
+        </ZModal>
 
         <div v-if="shouldShowPagination" class="pagination-row pagination-row--stacked">
           <span class="pagination-text">共 {{ total }} 条，当前第 {{ page }} / {{ totalPages }} 页</span>
@@ -261,24 +251,11 @@ function closeDetail(): void {
 
 <style scoped>
 .notification-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.notification-modal-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(15, 23, 42, 0.48);
+  height: 100%;
 }
 
 .notification-modal {
-  width: min(640px, 100%);
+  width: min(640px, 88vw);
   max-height: min(80vh, 720px);
   padding: 20px;
   display: flex;
@@ -295,8 +272,16 @@ function closeDetail(): void {
   gap: 12px;
 }
 
+.notification-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .notification-modal-title {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 18px;
   color: var(--text-color);
 }
@@ -312,35 +297,9 @@ function closeDetail(): void {
   line-height: 1;
 }
 
-.notification-modal-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.notification-modal-content {
-  overflow-y: auto;
-}
-
 .panel-card {
   padding: 18px;
 }
-
-.panel-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.panel-hero-copy {
-  flex: 1;
-  min-width: 0;
-}
-
 .panel-eyebrow {
   display: inline-flex;
   margin-bottom: 8px;
@@ -349,18 +308,10 @@ function closeDetail(): void {
   font-weight: 700;
 }
 
-.panel-title {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-color);
-}
-
 .panel-description,
 .panel-tip,
-.toolbar-meta,
 .notification-meta,
 .pagination-text,
-.detail-label,
 .summary-label {
   color: var(--text-secondary);
   font-size: 13px;
@@ -369,13 +320,6 @@ function closeDetail(): void {
 .panel-description {
   margin: 8px 0 0;
   line-height: 1.6;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
 }
 
 .summary-grid {
@@ -416,6 +360,7 @@ function closeDetail(): void {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 100%;
 }
 
 .empty-card {
@@ -446,6 +391,7 @@ function closeDetail(): void {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .filter-tabs {
@@ -479,6 +425,7 @@ function closeDetail(): void {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex: 1;
 }
 
 .notification-thread {
@@ -589,9 +536,6 @@ function closeDetail(): void {
   font-size: 13px;
 }
 
-.detail-label {
-  margin-bottom: 8px;
-}
 
 .detail-content {
   color: var(--text-color);
@@ -620,6 +564,7 @@ function closeDetail(): void {
 .error-container,
 .empty-message {
   display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -649,14 +594,14 @@ function closeDetail(): void {
 .pagination-row {
   justify-content: space-between;
   flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 8px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
-  .notification-modal-mask {
-    padding: 16px;
-  }
-
   .notification-modal {
+    width: min(640px, calc(100vw - 32px));
     max-height: min(86vh, 720px);
     padding: 18px;
   }

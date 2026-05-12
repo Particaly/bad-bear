@@ -110,12 +110,6 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 <template>
   <div class="upload-panel">
-    <div class="panel-card panel-hero">
-      <div class="panel-hero-copy">
-        <h2 class="panel-title">上传插件</h2>
-      </div>
-    </div>
-
     <!-- Not logged in -->
     <div v-if="!isLoggedIn" class="panel-card section-card empty-card">
       <h3 class="section-title">登录后上传插件</h3>
@@ -267,25 +261,6 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   border-radius: 8px;
   background: var(--card-bg);
   backdrop-filter: blur(40px) saturate(180%);
-}
-
-.panel-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  height: 74px;
-}
-
-.panel-hero-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.panel-title {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-color);
 }
 
 .panel-description {

@@ -2,28 +2,25 @@
 import { computed, ref, watch } from 'vue'
 import PluginCommentsSection from './detail/PluginCommentsSection.vue'
 import PluginReadmePanel from './detail/PluginReadmePanel.vue'
-import PluginVersionDialog from './detail/PluginVersionDialog.vue'
+import PluginVersionsSection from './detail/PluginVersionsSection.vue'
 import { formatDownloads, formatSize } from './detail/formatters'
 import type {
   PluginCommentTreeNode,
   PluginDetailReadme,
   PluginDetailVersion,
-  PluginHashOption,
   PluginMarketUiPlugin,
   PluginRiskInfo,
-  PluginVersionOption,
 } from '../../types/pluginMarket'
 
-type PluginDetailBusyAction = 'download' | 'upgrade' | 'reload' | 'share' | 'uninstall' | null
+type PluginDetailBusyAction = 'download' | 'upgrade' | 'stop' | 'uninstall' | null
 
-type TabId = 'detail' | 'commands' | 'comments'
+type TabId = 'detail' | 'commands' | 'comments' | 'versions'
 
 const props = defineProps<{
   plugin: PluginMarketUiPlugin
   busyAction?: PluginDetailBusyAction
-  shareDisabled?: boolean
-  shareTitle?: string
   isRunning?: boolean
+  canStop?: boolean
   isLoggedIn?: boolean
   isInternal?: boolean
   canInstallFromMarket?: boolean
@@ -39,18 +36,14 @@ const props = defineProps<{
   commentSubmitting?: boolean
   currentUserAvatarUrl?: string
   commentSubmitSuccessKey?: number
-  versionOptions?: PluginVersionOption[]
-  hashOptions?: PluginHashOption[]
+  versions?: PluginDetailVersion[]
   selectedVersion?: string | null
   selectedHash?: string | null
-  selectedBuild?: PluginDetailVersion | null
   remoteReadme?: PluginDetailReadme | null
   sourceLabel?: string
-  buildSourceLabel?: string
   risk?: PluginRiskInfo | null
   riskLoading?: boolean
   riskError?: string
-  installActionText?: string
 }>()
 
 const emit = defineEmits<{
@@ -60,28 +53,25 @@ const emit = defineEmits<{
   (e: 'install-latest'): void
   (e: 'upgrade'): void
   (e: 'uninstall'): void
-  (e: 'share'): void
   (e: 'open-folder'): void
-  (e: 'reload'): void
+  (e: 'stop'): void
+  (e: 'select-version', version: PluginDetailVersion): void
+  (e: 'install-version', version: PluginDetailVersion): void
   (e: 'submit-rating', score: number): void
   (e: 'submit-comment', payload: { content: string; parentId?: string }): void
   (e: 'load-more-comments'): void
-  (e: 'select-version', value: string | number): void
-  (e: 'select-hash', value: string | number): void
 }>()
 
 const activeTab = ref<TabId>('detail')
-const isVersionModalOpen = ref(false)
 
 const isInstalledPlugin = computed(() => props.plugin.installed && !!props.plugin.path)
 const isFromMarket = computed(() => !!props.plugin.marketPlugin)
-const hasBuildOptions = computed(() => (props.versionOptions?.length || 0) > 0)
-const currentVersion = computed(() => props.selectedVersion || props.plugin.version || '-')
+const showStopAction = computed(() => !!props.isRunning && props.canStop !== false)
+const currentVersion = computed(() => props.plugin.version || '-')
 const displayAverageRating = computed(() => props.avgRating ?? props.plugin.avgRating ?? 0)
 const displayRatingCount = computed(() => props.ratingCount ?? props.plugin.ratingCount ?? 0)
 
 const detailSourceText = computed(() => props.sourceLabel || '')
-const buildSourceText = computed(() => props.buildSourceLabel || '')
 const hasVisibleRisk = computed(() => {
   if (!props.risk || props.riskError || props.riskLoading) {
     return false
@@ -90,26 +80,9 @@ const hasVisibleRisk = computed(() => {
   const normalized = String(props.risk.riskLevel || '').trim().toUpperCase()
   return !!normalized && normalized !== 'SAFE' && normalized !== 'NONE' && normalized !== 'LOW'
 })
-const buildUploaderText = computed(() => {
-  const build = props.selectedBuild
-  if (!build) {
-    return ''
-  }
-
-  return build.uploaderUsername || build.uploaderAccount || build.uploaderUserId || ''
-})
 
 function isBusyAction(action: Exclude<PluginDetailBusyAction, null>): boolean {
   return props.busyAction === action
-}
-
-function handleInstallAction(): void {
-  if (isInstalledPlugin.value) {
-    emit('upgrade')
-    return
-  }
-
-  emit('download')
 }
 
 function openHomepage(): void {
@@ -119,17 +92,10 @@ function openHomepage(): void {
   }
 }
 
-function openVersionModal(): void {
-  if (hasBuildOptions.value) {
-    isVersionModalOpen.value = true
-  }
-}
-
 watch(
   () => [props.plugin.name, props.plugin.path],
   () => {
     activeTab.value = 'detail'
-    isVersionModalOpen.value = false
   },
 )
 </script>
@@ -155,22 +121,10 @@ watch(
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
             </svg>
           </button>
-          <button class="icon-btn topbar-action-btn reload-btn" title="重载" :disabled="!!busyAction" @click="emit('reload')">
-            <div v-if="isBusyAction('reload')" class="spinner"></div>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-          </button>
-          <button class="icon-btn topbar-action-btn share-btn" :title="isInternal ? '内置插件，不可分享' : shareTitle || '分享'" :disabled="!!busyAction || shareDisabled" @click="emit('share')">
-            <div v-if="isBusyAction('share')" class="spinner"></div>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="5" r="3"></circle>
-              <circle cx="6" cy="12" r="3"></circle>
-              <circle cx="18" cy="19" r="3"></circle>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          <button v-if="showStopAction" class="icon-btn topbar-action-btn stop-btn" title="停止运行" :disabled="!!busyAction" @click="emit('stop')">
+            <div v-if="isBusyAction('stop')" class="spinner"></div>
+            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2"></rect>
             </svg>
           </button>
           <button class="icon-btn topbar-action-btn delete-btn" :title="isInternal ? '内置插件，不可卸载' : '卸载'" :disabled="!!busyAction || isInternal" @click="emit('uninstall')">
@@ -206,7 +160,7 @@ watch(
             <div class="detail-info">
               <div class="detail-title">
                 <span class="detail-name">{{ plugin.title || plugin.name }}</span>
-                <span class="detail-version" :class="{ 'detail-version--clickable': hasBuildOptions }" @click="openVersionModal">v{{ currentVersion }}</span>
+                <span class="detail-version">v{{ currentVersion }}</span>
                 <span v-if="detailSourceText" class="detail-badge detail-badge-source">{{ detailSourceText }}</span>
                 <div class="detail-badges">
                   <span v-if="plugin.installed" class="detail-badge">已安装</span>
@@ -271,6 +225,9 @@ watch(
           <button v-if="isFromMarket" class="tab-button" :class="{ active: activeTab === 'comments' }" @click="activeTab = 'comments'">
             评论
           </button>
+          <button v-if="isFromMarket" class="tab-button" :class="{ active: activeTab === 'versions' }" @click="activeTab = 'versions'">
+            历史版本
+          </button>
         </div>
 
         <div class="tab-content">
@@ -308,29 +265,23 @@ watch(
               @load-more-comments="emit('load-more-comments')"
             />
           </div>
+
+          <div v-if="activeTab === 'versions'" class="tab-panel versions-panel">
+            <PluginVersionsSection
+              :versions="versions"
+              :selected-version="selectedVersion"
+              :selected-hash="selectedHash"
+              :installed="isInstalledPlugin"
+              :local-version="plugin.localVersion"
+              :busy-action="busyAction"
+              :can-install-from-market="canInstallFromMarket"
+              @select-version="emit('select-version', $event)"
+              @install-version="emit('install-version', $event)"
+            />
+          </div>
         </div>
       </div>
     </div>
-
-    <PluginVersionDialog
-      :visible="isVersionModalOpen"
-      :installed="isInstalledPlugin"
-      :local-version="plugin.localVersion"
-      :selected-version="selectedVersion"
-      :selected-hash="selectedHash"
-      :selected-build="selectedBuild"
-      :version-options="versionOptions"
-      :hash-options="hashOptions"
-      :install-action-text="installActionText"
-      :busy-action="busyAction"
-      :can-install-from-market="canInstallFromMarket"
-      :build-source-text="buildSourceText"
-      :build-uploader-text="buildUploaderText"
-      @update:visible="isVersionModalOpen = $event"
-      @install="handleInstallAction"
-      @select-version="emit('select-version', $event)"
-      @select-hash="emit('select-hash', $event)"
-    />
   </div>
 </template>
 
@@ -390,18 +341,22 @@ watch(
 
 .topbar-action-btn.open-btn,
 .topbar-action-btn.folder-btn,
-.topbar-action-btn.reload-btn,
-.topbar-action-btn.share-btn,
 .topbar-action-btn.install-btn {
   color: var(--primary-color);
 }
 
 .topbar-action-btn.open-btn:hover:not(:disabled),
 .topbar-action-btn.folder-btn:hover:not(:disabled),
-.topbar-action-btn.reload-btn:hover:not(:disabled),
-.topbar-action-btn.share-btn:hover:not(:disabled),
 .topbar-action-btn.install-btn:hover:not(:disabled) {
   background: var(--primary-light-bg);
+}
+
+.topbar-action-btn.stop-btn {
+  color: var(--warning-color);
+}
+
+.topbar-action-btn.stop-btn:hover:not(:disabled) {
+  background: var(--warning-light-bg);
 }
 
 .topbar-action-btn.delete-btn {
@@ -495,16 +450,6 @@ watch(
   font-weight: 500;
 }
 
-.detail-version--clickable {
-  color: var(--primary-color);
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.detail-version--clickable:hover {
-  opacity: 0.7;
-}
-
 .detail-badges {
   display: flex;
   align-items: center;
@@ -584,6 +529,11 @@ watch(
   width: 1px;
   height: 12px;
   background: var(--divider-color);
+}
+
+.detail-risk-card {
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--danger-color, #ef4444) 6%, var(--surface-color, var(--card-bg)));
 }
 
 .tab-container {
@@ -672,7 +622,8 @@ watch(
   line-height: 1.5;
 }
 
-.comments-panel {
+.comments-panel,
+.versions-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;

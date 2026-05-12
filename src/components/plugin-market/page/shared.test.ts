@@ -5,13 +5,9 @@ import {
   createEmptyPluginDetailState,
   createEmptyNotificationState,
   isPluginHostPermissionDeniedError,
-  buildPluginVersionOptions,
-  buildPluginHashOptions,
-  buildResolvedPluginDownloadTarget,
+  buildCurrentPluginDownloadTarget,
   mapPluginSourceLabel,
   parsePluginSourceReference,
-  resolveSelectedVersion,
-  resolveSelectedHash,
   mergePluginDetailIntoPlugin,
   validateUsername,
   validatePassword,
@@ -184,7 +180,7 @@ describe('plugin market page helpers', () => {
 
     it('accepts valid avatar file', () => {
       const file = new File([''], 'avatar.jpg', { type: 'image/jpeg' })
-      Object.defineProperty(file, 'size', { value: 1024 * 1024 }) // 1MB
+      Object.defineProperty(file, 'size', { value: 1024 * 1024 })
       expect(() => validateAvatarFile(file)).not.toThrow()
     })
 
@@ -195,7 +191,7 @@ describe('plugin market page helpers', () => {
 
     it('rejects avatar file that is too large', () => {
       const file = new File([''], 'avatar.jpg', { type: 'image/jpeg' })
-      Object.defineProperty(file, 'size', { value: 6 * 1024 * 1024 }) // 6MB
+      Object.defineProperty(file, 'size', { value: 6 * 1024 * 1024 })
       expect(() => validateAvatarFile(file)).toThrow('头像大小不能超过 5MB')
     })
   })
@@ -217,7 +213,7 @@ describe('plugin market page helpers', () => {
           fileSize: 1024,
           downloads: 100,
           createdAt: '2026-04-01T00:00:00Z',
-          source: 'provider-sync',
+          source: { type: 'provider', provider: { id: 'provider-1', name: '官方' } },
           uploaderUsername: 'octocat',
         },
         { id: '2', version: '1.5.0', hash: 'abc123', fileSize: 1024, downloads: 50, createdAt: '2026-03-01T00:00:00Z' },
@@ -244,54 +240,27 @@ describe('plugin market page helpers', () => {
       expect(state.requestId).toBe(0)
     })
 
-    it('builds version options from detail', () => {
-      const options = buildPluginVersionOptions(mockDetail)
-      expect(options).toHaveLength(2)
-      expect(options[0].value).toBe('2.0.0')
-      expect(options[0].label).toBe('2.0.0（2 个构建）')
-      expect(options[1].value).toBe('1.5.0')
-      expect(options[1].label).toBe('1.5.0')
+    it('maps provider-backed sources through embedded provider names', () => {
+      const reference = parsePluginSourceReference({
+        type: 'provider',
+        provider: { id: 'provider-1', name: '官方' },
+      })
+      expect(mapPluginSourceLabel(reference)).toBe('官方')
     })
 
-    it('builds hash options for selected version', () => {
-      const options = buildPluginHashOptions(mockDetail, '2.0.0')
-      expect(options).toHaveLength(2)
-      expect(options[0].value).toBe('def456')
-      expect(options[0].label).toBe('def456（最新构建）')
-      expect(options[0].source).toBe('provider-sync')
-      expect(options[0].uploaderUsername).toBe('octocat')
-      expect(options[1].value).toBe('xyz789')
+    it('does not show a fallback label for provider-backed sources without names', () => {
+      const reference = parsePluginSourceReference({ type: 'provider' })
+      expect(mapPluginSourceLabel(reference)).toBe('')
     })
 
-    it('returns empty hash options when no version selected', () => {
-      const options = buildPluginHashOptions(mockDetail, null)
-      expect(options).toEqual([])
-    })
-
-    it('resolves selected version preferring local version if available', () => {
-      const version = resolveSelectedVersion(mockDetail, '1.5.0')
-      expect(version).toBe('1.5.0')
-    })
-
-    it('resolves to latest version when local version not available', () => {
-      const version = resolveSelectedVersion(mockDetail, '1.0.0')
-      expect(version).toBe('2.0.0')
-    })
-
-    it('resolves selected hash for version', () => {
-      const hash = resolveSelectedHash(mockDetail, '2.0.0')
-      expect(hash).toBe('def456')
-    })
-
-    it('maps provider-backed sources through public provider display names', () => {
-      const reference = parsePluginSourceReference({ type: 'provider-sync', providerId: 'provider-1' })
-      const label = mapPluginSourceLabel(reference, { id: 'provider-1', publicName: 'NPM 官方源' })
-      expect(label).toBe('来源同步 · NPM 官方源')
+    it('maps local sources as user uploads', () => {
+      const reference = parsePluginSourceReference({ type: 'local' })
+      expect(mapPluginSourceLabel(reference)).toBe('用户上传')
     })
 
     it('maps uploaded sources without exposing raw payloads', () => {
       const reference = parsePluginSourceReference('manual-upload')
-      expect(mapPluginSourceLabel(reference, null)).toBe('用户上传')
+      expect(mapPluginSourceLabel(reference)).toBe('用户上传')
     })
 
     it('merges plugin detail into plugin', () => {
@@ -328,7 +297,7 @@ describe('plugin market page helpers', () => {
       expect(merged.ratingCount).toBe(100)
     })
 
-    it('builds resolved download target with version and hash', () => {
+    it('builds resolved download target with latest detail build by default', () => {
       const plugin: PluginMarketUiPlugin = {
         name: 'test-plugin',
         version: '1.0.0',
@@ -345,10 +314,36 @@ describe('plugin market page helpers', () => {
           downloadUrl: 'https://example.com/test-plugin/1.0.0/download',
         },
       }
-      const target = buildResolvedPluginDownloadTarget(plugin, mockDetail, '2.0.0', 'def456')
+      const target = buildCurrentPluginDownloadTarget(plugin, mockDetail)
       expect(target?.version).toBe('2.0.0')
       expect(target?.hash).toBe('def456')
       expect(target?.downloadMode).toBe('hash')
+    })
+
+    it('builds resolved download target for selected historical build', () => {
+      const plugin: PluginMarketUiPlugin = {
+        name: 'test-plugin',
+        version: '1.0.0',
+        title: 'Test Plugin',
+        description: 'Test',
+        installed: false,
+        logo: null,
+        size: null,
+        marketPlugin: {
+          name: 'test-plugin',
+          version: '1.0.0',
+          title: 'Test Plugin',
+          description: 'Test',
+          downloadUrl: 'https://example.com/test-plugin/1.0.0/download',
+        },
+      }
+      const selectedBuild = mockDetail.versions[1]
+      const target = buildCurrentPluginDownloadTarget(plugin, mockDetail, selectedBuild)
+      expect(target?.version).toBe('1.5.0')
+      expect(target?.hash).toBe('abc123')
+      expect(target?.downloadMode).toBe('hash')
+      expect(target?.build?.hash).toBe('abc123')
+      expect(target?.downloadUrl).toContain('/test-plugin/1.5.0/abc123/download')
     })
 
     it('builds resolved download target in latest mode when no detail', () => {
@@ -368,7 +363,7 @@ describe('plugin market page helpers', () => {
           downloadUrl: 'https://example.com/test-plugin/1.0.0/download',
         },
       }
-      const target = buildResolvedPluginDownloadTarget(plugin, null, null, null)
+      const target = buildCurrentPluginDownloadTarget(plugin, null)
       expect(target?.downloadMode).toBe('latest')
       expect(target?.version).toBe('1.0.0')
     })

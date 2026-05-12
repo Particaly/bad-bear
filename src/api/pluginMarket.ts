@@ -2,9 +2,7 @@ export {
   getPluginDetail,
   getPluginDetailByHash,
   getPluginRisk,
-  getPluginVersionBuilds,
   getPluginStats,
-  getPublicProviderById,
   getPluginRatings,
   createPluginRating,
   getPluginComments,
@@ -39,12 +37,7 @@ export {
   getPluginReadme as readPluginReadme,
   openInstalledPlugin,
   reloadInstalledPlugin,
+  stopInstalledPlugin,
   revealPluginInFinder,
   inferPlatform,
 } from './pluginMarketHost'
-
-export {
-  packageInstalledPlugin,
-  removeTempPluginPackage,
-  readFileAsBlob,
-} from './pluginMarketPackaging'

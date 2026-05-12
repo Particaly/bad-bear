@@ -6,8 +6,6 @@ import {
   getPluginDetail,
   getPluginRatings,
   getPluginRisk,
-  getPluginVersionBuilds,
-  getPublicProviderById,
 } from '../../../api/pluginMarket'
 import type { AuthUser } from '../../../types/auth'
 import type {
@@ -18,24 +16,18 @@ import type {
 } from '../../../types/pluginMarket'
 import {
   buildCommentTree,
-  buildPluginHashOptions,
-  buildPluginVersionOptions,
-  buildResolvedPluginDownloadTarget,
+  buildCurrentPluginDownloadTarget,
   createEmptyPluginDetailState,
   getErrorMessage,
   mapPluginSourceLabel,
   mergePluginDetailIntoPlugin,
   parsePluginSourceReference,
-  resolveSelectedHash,
-  resolveSelectedVersion,
 } from './shared'
-import { compareVersions } from '../utils'
 
 export function usePluginMarketDetail(options: {
   selectedPlugin: ComputedRef<PluginMarketUiPlugin | null>
   selectedPluginName: Ref<string | null>
   currentUser: Ref<AuthUser | null>
-  canInstallFromMarket: Ref<boolean>
   requireShopLogin: (actionLabel: string) => boolean
   notifyError: (message: string) => void
   notifySuccess: (message: string) => void
@@ -44,52 +36,31 @@ export function usePluginMarketDetail(options: {
   const pluginCommentSubmitSuccessKey = ref(0)
 
   const pluginCommentTree = computed(() => buildCommentTree(pluginDetailState.value.comments))
-  const selectedSourceLabel = computed(() => {
-    const selectedBuild = selectedPluginBuild.value
-    const source = selectedBuild?.source || pluginDetailState.value.detail?.source
-    return mapPluginSourceLabel(
-      parsePluginSourceReference(source),
-      pluginDetailState.value.buildSourceProvider || pluginDetailState.value.sourceProvider,
-    )
-  })
-  const selectedBuildSourceLabel = computed(() =>
-    mapPluginSourceLabel(
-      parsePluginSourceReference(selectedPluginBuild.value?.source),
-      pluginDetailState.value.buildSourceProvider,
-    ),
+  const selectedSourceLabel = computed(() =>
+    mapPluginSourceLabel(parsePluginSourceReference(pluginDetailState.value.detail?.source)),
   )
   const hasMorePluginComments = computed(
     () => pluginDetailState.value.comments.length < pluginDetailState.value.commentTotal,
   )
-  const pluginVersionOptions = computed(() =>
-    buildPluginVersionOptions(pluginDetailState.value.detail),
-  )
-  const selectedVersionHashOptions = computed(() =>
-    buildPluginHashOptions(pluginDetailState.value.detail, pluginDetailState.value.selectedVersion),
-  )
-  const selectedPluginBuild = computed<PluginDetailVersion | null>(() => {
-    if (
-      !pluginDetailState.value.detail ||
-      !pluginDetailState.value.selectedVersion ||
-      !pluginDetailState.value.selectedHash
-    ) {
+  const selectedPluginDetailVersion = computed<PluginDetailVersion | null>(() => {
+    const detail = pluginDetailState.value.detail
+    const selectedVersion = pluginDetailState.value.selectedVersion
+    const selectedHash = pluginDetailState.value.selectedHash
+    if (!detail || !selectedVersion || !selectedHash) {
       return null
     }
 
     return (
-      pluginDetailState.value.detail.versions.find(
-        (item) =>
-          item.version === pluginDetailState.value.selectedVersion &&
-          item.hash === pluginDetailState.value.selectedHash,
+      detail.versions.find(
+        (version) => version.version === selectedVersion && version.hash === selectedHash,
       ) || null
     )
   })
-  const resolvedSelectedPluginTarget = computed<ResolvedPluginDownloadTarget | null>(() =>
-    buildResolvedPluginDownloadTarget(
+  const currentPluginDownloadTarget = computed<ResolvedPluginDownloadTarget | null>(() =>
+    buildCurrentPluginDownloadTarget(
       options.selectedPlugin.value,
       pluginDetailState.value.detail,
-      pluginDetailState.value.selectedVersion,
-      pluginDetailState.value.selectedHash,
+      selectedPluginDetailVersion.value,
     ),
   )
   const mergedSelectedPlugin = computed(() => {
@@ -100,39 +71,8 @@ export function usePluginMarketDetail(options: {
     return mergePluginDetailIntoPlugin(
       options.selectedPlugin.value,
       pluginDetailState.value.detail,
-      resolvedSelectedPluginTarget.value,
+      currentPluginDownloadTarget.value,
     )
-  })
-  const selectedPluginActionText = computed(() => {
-    const plugin = mergedSelectedPlugin.value
-    const target = resolvedSelectedPluginTarget.value
-
-    if (!plugin) {
-      return options.canInstallFromMarket.value ? '安装插件' : '下载插件文件'
-    }
-
-    if (!options.canInstallFromMarket.value) {
-      return target?.downloadUrl ? '下载插件文件' : '暂无可下载文件'
-    }
-
-    if (!target?.build) {
-      return plugin.installed ? '暂无可安装构建' : '暂无可安装版本'
-    }
-
-    if (!plugin.installed || !plugin.localVersion) {
-      return '安装所选版本'
-    }
-
-    const comparison = compareVersions(plugin.localVersion, target.version)
-    if (comparison < 0) {
-      return '升级到所选版本'
-    }
-
-    if (comparison > 0) {
-      return '安装历史版本'
-    }
-
-    return '安装所选构建'
   })
 
   async function loadPluginDetail(name: string, requestId: number): Promise<void> {
@@ -146,84 +86,18 @@ export function usePluginMarketDetail(options: {
 
     pluginDetailState.value.detail = detail
 
-    const currentSelectedVersion = pluginDetailState.value.selectedVersion
-    const currentSelectedHash = pluginDetailState.value.selectedHash
-    const hasCurrentVersion =
-      !!currentSelectedVersion &&
-      detail.versions.some((item) => item.version === currentSelectedVersion)
-    const nextSelectedVersion = hasCurrentVersion
-      ? currentSelectedVersion
-      : resolveSelectedVersion(detail, options.selectedPlugin.value?.localVersion)
-
-    if (nextSelectedVersion) {
-      try {
-        const buildsResponse = await getPluginVersionBuilds(name, nextSelectedVersion)
-        if (
-          pluginDetailState.value.requestId !== requestId ||
-          options.selectedPluginName.value !== name ||
-          !pluginDetailState.value.detail
-        ) {
-          return
-        }
-
-        const remainingVersions = pluginDetailState.value.detail.versions.filter(
-          (item) => item.version !== nextSelectedVersion,
-        )
-        pluginDetailState.value.detail = {
-          ...pluginDetailState.value.detail,
-          versions: [...buildsResponse.items, ...remainingVersions],
-        }
-      } catch (error) {
-        console.warn('[PluginMarket] 加载版本构建列表失败，继续使用详情接口返回数据:', error)
-      }
-    }
-
-    const nextDetail = pluginDetailState.value.detail
-    const nextSelectedHash =
-      nextSelectedVersion &&
-      currentSelectedHash &&
-      nextDetail?.versions.some(
-        (item) => item.version === nextSelectedVersion && item.hash === currentSelectedHash,
-      )
-        ? currentSelectedHash
-        : resolveSelectedHash(nextDetail, nextSelectedVersion)
-
-    pluginDetailState.value.selectedVersion = nextSelectedVersion
-    pluginDetailState.value.selectedHash = nextSelectedHash
-
-    await Promise.all([
-      loadSourceProvider(pluginDetailState.value.detail?.source, (provider) => {
-        pluginDetailState.value.sourceProvider = provider
-      }),
-      loadSourceProvider(
-        pluginDetailState.value.detail?.versions.find(
-          (item) =>
-            item.version === pluginDetailState.value.selectedVersion &&
-            item.hash === pluginDetailState.value.selectedHash,
-        )?.source,
-        (provider) => {
-          pluginDetailState.value.buildSourceProvider = provider
-        },
-      ),
-    ])
-  }
-
-  async function loadSourceProvider(
-    source: unknown,
-    assign: (provider: import('../../../types/pluginMarket').PublicProviderRecord | null) => void,
-  ): Promise<void> {
-    const reference = parsePluginSourceReference(source as import('../../../types/pluginMarket').PluginReleaseSource)
-    if (!reference?.providerId) {
-      assign(null)
+    const selectedVersion = pluginDetailState.value.selectedVersion
+    const selectedHash = pluginDetailState.value.selectedHash
+    if (!selectedVersion || !selectedHash) {
       return
     }
 
-    try {
-      const provider = await getPublicProviderById(reference.providerId)
-      assign(provider)
-    } catch (error) {
-      console.warn('[PluginMarket] 加载来源详情失败，继续使用映射兜底文案:', error)
-      assign(null)
+    const hasSelectedVersion = detail.versions.some(
+      (version) => version.version === selectedVersion && version.hash === selectedHash,
+    )
+    if (!hasSelectedVersion) {
+      pluginDetailState.value.selectedVersion = null
+      pluginDetailState.value.selectedHash = null
     }
   }
 
@@ -377,14 +251,10 @@ export function usePluginMarketDetail(options: {
 
     const pluginName = options.selectedPlugin.value.name
     const requestId = pluginDetailState.value.requestId + 1
-    const previousSelectedVersion = pluginDetailState.value.selectedVersion
-    const previousSelectedHash = pluginDetailState.value.selectedHash
     pluginDetailState.value = {
       ...createEmptyPluginDetailState(),
       requestId,
       commentLoading: true,
-      selectedVersion: previousSelectedVersion,
-      selectedHash: previousSelectedHash,
     }
 
     try {
@@ -392,11 +262,20 @@ export function usePluginMarketDetail(options: {
       await Promise.all([
         loadCurrentUserPluginRating(pluginName, requestId),
         loadPluginComments(pluginName, requestId),
-        loadPluginRisk(pluginName, requestId, pluginDetailState.value.selectedVersion),
+        loadPluginRisk(
+          pluginName,
+          requestId,
+          pluginDetailState.value.detail?.version || options.selectedPlugin.value.version,
+        ),
       ])
     } catch (error) {
       console.error('[PluginMarket] 加载插件详情交互数据失败:', error)
     }
+  }
+
+  function selectPluginDetailVersion(version: PluginDetailVersion): void {
+    pluginDetailState.value.selectedVersion = version.version
+    pluginDetailState.value.selectedHash = version.hash
   }
 
   async function handleLoadMorePluginComments(): Promise<void> {
@@ -477,81 +356,19 @@ export function usePluginMarketDetail(options: {
     }
   }
 
-  async function selectPluginDetailVersion(version: string | number): Promise<void> {
-    const normalizedVersion = typeof version === 'number' ? String(version) : version
-    pluginDetailState.value.selectedVersion = normalizedVersion
-
-    if (options.selectedPlugin.value) {
-      try {
-        const buildsResponse = await getPluginVersionBuilds(options.selectedPlugin.value.name, normalizedVersion)
-        if (pluginDetailState.value.detail) {
-          const remainingVersions = pluginDetailState.value.detail.versions.filter(
-            (item) => item.version !== normalizedVersion,
-          )
-          pluginDetailState.value.detail = {
-            ...pluginDetailState.value.detail,
-            versions: [...buildsResponse.items, ...remainingVersions],
-          }
-        }
-      } catch (error) {
-        console.warn('[PluginMarket] 加载所选版本构建列表失败，继续使用现有版本数据:', error)
-      }
-
-      void loadPluginRisk(
-        options.selectedPlugin.value.name,
-        pluginDetailState.value.requestId,
-        normalizedVersion,
-      )
-      void loadSourceProvider(
-        pluginDetailState.value.detail?.versions.find(
-          (item) => item.version === normalizedVersion && item.hash === pluginDetailState.value.selectedHash,
-        )?.source,
-        (provider) => {
-          pluginDetailState.value.buildSourceProvider = provider
-        },
-      )
-    }
-
-    pluginDetailState.value.selectedHash = resolveSelectedHash(
-      pluginDetailState.value.detail,
-      normalizedVersion,
-    )
-  }
-
-  function selectPluginDetailHash(hash: string | number): void {
-    pluginDetailState.value.selectedHash = typeof hash === 'number' ? String(hash) : hash
-
-    void loadSourceProvider(
-      pluginDetailState.value.detail?.versions.find(
-        (item) =>
-          item.version === pluginDetailState.value.selectedVersion &&
-          item.hash === pluginDetailState.value.selectedHash,
-      )?.source,
-      (provider) => {
-        pluginDetailState.value.buildSourceProvider = provider
-      },
-    )
-  }
-
   return {
     pluginDetailState,
     pluginCommentSubmitSuccessKey,
     pluginCommentTree,
     hasMorePluginComments,
     selectedSourceLabel,
-    selectedBuildSourceLabel,
-    pluginVersionOptions,
-    selectedVersionHashOptions,
-    selectedPluginBuild,
-    resolvedSelectedPluginTarget,
+    currentPluginDownloadTarget,
     mergedSelectedPlugin,
-    selectedPluginActionText,
+    selectPluginDetailVersion,
     resetPluginDetailState,
     reloadSelectedPluginDetail,
     handleLoadMorePluginComments,
     handleSubmitPluginRating,
     handleSubmitPluginComment,
-    selectPluginDetailVersion,
-    selectPluginDetailHash,
   }
 }

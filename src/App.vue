@@ -11,9 +11,6 @@ import { useTheme } from './config/theme'
 
 onMounted(() => {
   void useTheme()
-
-  window.ztools.onPluginEnter(() => {})
-  window.ztools.onPluginOut(() => {})
 })
 </script>
 

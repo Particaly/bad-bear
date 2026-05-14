@@ -12,15 +12,24 @@ import type { PluginMarketUiPlugin } from '../../../../types/pluginMarket'
 import { getErrorMessage } from '../shared'
 
 /**
- * 处理打开已安装的插件
+ * 处理打开已安装的插件。
+ * 对来自插件市场的插件会先执行风险确认，弹框被直接关闭时中断本次打开。
  */
 export async function handleOpenPlugin(
   plugin: PluginMarketUiPlugin,
   params: {
     notifyError: (message: string) => void
+    confirmOpenPluginRisk?: (plugin: PluginMarketUiPlugin) => Promise<boolean>
   },
 ): Promise<void> {
   try {
+    if (params.confirmOpenPluginRisk) {
+      const confirmed = await params.confirmOpenPluginRisk(plugin)
+      if (!confirmed) {
+        return
+      }
+    }
+
     const result = await openInstalledPlugin(plugin)
     if (result && result.success === false) {
       throw new Error(result.error || '打开插件失败')

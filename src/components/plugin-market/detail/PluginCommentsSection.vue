@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ZButton } from 'ztools-ui'
+import { ZButton, ZModal } from 'ztools-ui'
 import { buildShopApiAssetUrl } from '../../../config/runtimeConfig'
 import type { PluginCommentTreeNode } from '../../../types/pluginMarket'
 import { formatDateTime } from '../utils'
@@ -248,8 +248,13 @@ watch(
       </div>
     </div>
 
-    <div v-if="isRatingModalOpen" class="rating-modal-mask" @click.self="closeRatingModal">
-      <div class="rating-modal card" role="dialog" aria-modal="true" :aria-label="ratingModalTitle">
+    <ZModal
+      :show="isRatingModalOpen"
+      to="body"
+      :mask-closable="true"
+      @update:show="(value) => !value && closeRatingModal()"
+    >
+      <div class="rating-modal card" :aria-label="ratingModalTitle">
         <div class="rating-modal-header">
           <div>
             <div class="section-title">{{ ratingModalTitle }}</div>
@@ -280,7 +285,7 @@ watch(
           </ZButton>
         </div>
       </div>
-    </div>
+    </ZModal>
 
     <div class="comment-editor card">
       <div class="comment-editor-header">
@@ -428,20 +433,10 @@ watch(
   flex-shrink: 0;
 }
 
-.rating-modal-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(15, 23, 42, 0.45);
-}
-
 .rating-modal {
-  width: min(420px, 100%);
+  width: min(420px, calc(100vw - 40px));
   padding: 20px;
+  box-sizing: border-box;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
 }
 

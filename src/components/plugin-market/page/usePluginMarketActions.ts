@@ -21,6 +21,7 @@ export function usePluginMarketActions(options: {
     confirmText?: string
     cancelText?: string
   }) => Promise<boolean>
+  confirmOpenPluginRisk?: (plugin: PluginMarketUiPlugin) => Promise<boolean>
   reloadMarket: () => Promise<void>
   openPluginByName: (name: string) => void
   closePlugin: () => void
@@ -104,9 +105,13 @@ export function usePluginMarketActions(options: {
     })
   }
 
+  /**
+   * 统一处理已安装插件的打开动作，确保所有入口共享同一套风险确认逻辑。
+   */
   async function handleOpenPluginWrapper(plugin: PluginMarketUiPlugin): Promise<void> {
     await handleOpenPlugin(plugin, {
       notifyError: options.notifyError,
+      confirmOpenPluginRisk: options.confirmOpenPluginRisk,
     })
   }
 

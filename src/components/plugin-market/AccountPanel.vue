@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ZButton, ZInput, ZModal } from 'ztools-ui'
+import { ZButton, ZInput, ZModal, ZPopover } from 'ztools-ui'
 import type {
   AuthUser,
   GitHubBindingState,
@@ -431,50 +431,68 @@ function handleAvatarChange(event: Event): void {
 
             <div class="profile-main">
               <div class="profile-name-row">
-                <button
-                  class="profile-name-btn"
-                  type="button"
-                  :disabled="busy"
-                  title="点击修改用户名"
-                  aria-label="编辑用户名"
-                  @click="openUsernameModal"
-                >
-                  <span class="profile-name">{{ currentUser.username }}</span>
-                </button>
+                <ZPopover trigger="hover" placement="top" show-arrow>
+                  <template #trigger>
+                    <span class="popover-trigger-inline">
+                      <button
+                        class="profile-name-btn"
+                        type="button"
+                        :disabled="busy"
+                        aria-label="编辑用户名"
+                        @click="openUsernameModal"
+                      >
+                        <span class="profile-name">{{ currentUser.username }}</span>
+                      </button>
+                    </span>
+                  </template>
+                  <span>点击修改用户名</span>
+                </ZPopover>
                 <span class="profile-badge">已登录</span>
-                <button
-                  class="profile-password-btn"
-                  type="button"
-                  :disabled="busy"
-                  title="修改密码"
-                  aria-label="修改密码"
-                  @click="openPasswordModal"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor"><path stroke-width="1.5" d="M2 16c0-2.828 0-4.243.879-5.121C3.757 10 5.172 10 8 10h8c2.828 0 4.243 0 5.121.879C22 11.757 22 13.172 22 16s0 4.243-.879 5.121C20.243 22 18.828 22 16 22H8c-2.828 0-4.243 0-5.121-.879C2 20.243 2 18.828 2 16Z"/><path stroke-linecap="round" stroke-width="1.5" d="M6 10V8a6 6 0 0 1 11.811-1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h.009m3.982 0H12m3.991 0H16"/></g></svg>
-                </button>
-                <button
-                  class="profile-github-btn"
-                  :class="{ 'profile-github-btn--bound': githubBinding.bound }"
-                  type="button"
-                  :disabled="githubBindingActionDisabled"
-                  :title="githubBindingActionTitle"
-                  :aria-label="githubBindingActionTitle"
-                  @click="emit('github-bind')"
-                >
-                  <svg class="profile-github-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M12 2C6.477 2 2 6.484 2 12.017c0 4.426 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.866-.013-1.7-2.782.605-3.369-1.344-3.369-1.344-.455-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.004.07 1.531 1.033 1.531 1.033.892 1.53 2.341 1.088 2.91.832.091-.647.349-1.088.635-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.748-1.026 2.748-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .269.18.58.688.481A10.019 10.019 0 0 0 22 12.017C22 6.484 17.523 2 12 2Z"
-                    />
-                  </svg>
-                  <span v-if="isGithubBindingPending" class="profile-action-dot profile-action-dot--pending" aria-hidden="true"></span>
-                  <span v-else-if="githubBinding.bound" class="profile-action-dot profile-action-dot--success" aria-hidden="true"></span>
-                  <span
-                    v-else-if="githubBinding.errorMessage"
-                    class="profile-action-dot profile-action-dot--error"
-                    aria-hidden="true"
-                  ></span>
-                </button>
+                <ZPopover trigger="hover" placement="top" show-arrow>
+                  <template #trigger>
+                    <span class="popover-trigger-inline">
+                      <button
+                        class="profile-password-btn"
+                        type="button"
+                        :disabled="busy"
+                        aria-label="修改密码"
+                        @click="openPasswordModal"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor"><path stroke-width="1.5" d="M2 16c0-2.828 0-4.243.879-5.121C3.757 10 5.172 10 8 10h8c2.828 0 4.243 0 5.121.879C22 11.757 22 13.172 22 16s0 4.243-.879 5.121C20.243 22 18.828 22 16 22H8c-2.828 0-4.243 0-5.121-.879C2 20.243 2 18.828 2 16Z"/><path stroke-linecap="round" stroke-width="1.5" d="M6 10V8a6 6 0 0 1 11.811-1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h.009m3.982 0H12m3.991 0H16"/></g></svg>
+                      </button>
+                    </span>
+                  </template>
+                  <span>修改密码</span>
+                </ZPopover>
+                <ZPopover trigger="hover" placement="top" show-arrow>
+                  <template #trigger>
+                    <span class="popover-trigger-inline">
+                      <button
+                        class="profile-github-btn"
+                        :class="{ 'profile-github-btn--bound': githubBinding.bound }"
+                        type="button"
+                        :disabled="githubBindingActionDisabled"
+                        :aria-label="githubBindingActionTitle"
+                        @click="emit('github-bind')"
+                      >
+                        <svg class="profile-github-icon" viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            fill="currentColor"
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.426 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.866-.013-1.7-2.782.605-3.369-1.344-3.369-1.344-.455-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.004.07 1.531 1.033 1.531 1.033.892 1.53 2.341 1.088 2.91.832.091-.647.349-1.088.635-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.748-1.026 2.748-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .269.18.58.688.481A10.019 10.019 0 0 0 22 12.017C22 6.484 17.523 2 12 2Z"
+                          />
+                        </svg>
+                        <span v-if="isGithubBindingPending" class="profile-action-dot profile-action-dot--pending" aria-hidden="true"></span>
+                        <span v-else-if="githubBinding.bound" class="profile-action-dot profile-action-dot--success" aria-hidden="true"></span>
+                        <span
+                          v-else-if="githubBinding.errorMessage"
+                          class="profile-action-dot profile-action-dot--error"
+                          aria-hidden="true"
+                        ></span>
+                      </button>
+                    </span>
+                  </template>
+                  <span>{{ githubBindingActionTitle }}</span>
+                </ZPopover>
               </div>
               <div class="profile-account">账号：{{ currentUser.account }}</div>
               <div class="profile-meta">注册时间：{{ joinedAtText }}</div>
@@ -530,51 +548,54 @@ function handleAvatarChange(event: Event): void {
         </div>
       </Teleport>
 
-      <Teleport to="body">
-        <div v-if="isPasswordModalOpen" class="dialog-mask" @click.self="closePasswordModal">
-          <div class="dialog-card card">
-            <div class="dialog-header">
-              <div>
-                <h3 class="dialog-title">修改密码</h3>
-                <p class="dialog-description">
-                  若账号已设置密码，请填写当前密码<br />首次通过 GitHub 登录且尚未设置本地密码时可留空
-                </p>
-              </div>
-              <button class="dialog-close" type="button" :disabled="busy" @click="closePasswordModal">×</button>
+      <ZModal
+        :show="isPasswordModalOpen"
+        to="body"
+        :mask-closable="true"
+        @update:show="(value) => !value && closePasswordModal()"
+      >
+        <div class="dialog-card dialog-card--password">
+          <div class="dialog-header">
+            <div>
+              <h3 class="dialog-title">修改密码</h3>
+              <p class="dialog-description">
+                若账号已设置密码，请填写当前密码<br />首次通过 GitHub 登录且尚未设置本地密码时可留空
+              </p>
             </div>
+            <button class="dialog-close" type="button" :disabled="busy" @click="closePasswordModal">×</button>
+          </div>
 
-            <label class="field-label" for="password-current-modal-input">原密码</label>
-            <ZInput
-              id="password-current-modal-input"
-              v-model="currentPasswordDraft"
-              class="text-input"
-              type="password"
-              :maxlength="72"
-              :disabled="busy"
-              placeholder="如已设置密码，请输入原密码"
-            />
+          <label class="field-label" for="password-current-modal-input">原密码</label>
+          <ZInput
+            id="password-current-modal-input"
+            v-model="currentPasswordDraft"
+            class="text-input"
+            type="password"
+            :maxlength="72"
+            :disabled="busy"
+            placeholder="如已设置密码，请输入原密码"
+          />
 
-            <label class="field-label" for="password-new-modal-input">新密码</label>
-            <ZInput
-              id="password-new-modal-input"
-              v-model="newPasswordDraft"
-              class="text-input"
-              type="password"
-              :maxlength="72"
-              :disabled="busy"
-              placeholder="请输入新密码"
-              @keydown.enter="submitPasswordUpdate"
-            />
+          <label class="field-label" for="password-new-modal-input">新密码</label>
+          <ZInput
+            id="password-new-modal-input"
+            v-model="newPasswordDraft"
+            class="text-input"
+            type="password"
+            :maxlength="72"
+            :disabled="busy"
+            placeholder="请输入新密码"
+            @keydown.enter="submitPasswordUpdate"
+          />
 
-            <div class="action-row action-row--end">
-              <ZButton :disabled="busy" @click="closePasswordModal">取消</ZButton>
-              <ZButton type="primary" :disabled="busy" :loading="isUpdatingPassword" @click="submitPasswordUpdate">
-                保存密码
-              </ZButton>
-            </div>
+          <div class="action-row action-row--end">
+            <ZButton :disabled="busy" @click="closePasswordModal">取消</ZButton>
+            <ZButton type="primary" :disabled="busy" :loading="isUpdatingPassword" @click="submitPasswordUpdate">
+              保存密码
+            </ZButton>
           </div>
         </div>
-      </Teleport>
+      </ZModal>
 
       <Teleport to="body">
         <div v-if="isAvatarModalOpen" class="dialog-mask" @click.self="closeAvatarModal">
@@ -663,21 +684,28 @@ function handleAvatarChange(event: Event): void {
               placeholder="计算结果"
               @keydown.enter="submitLogin"
             />
-            <button
-              class="captcha-image-btn"
-              type="button"
-              :disabled="isCaptchaLoading"
-              title="点击刷新验证码"
-              @click="refreshCaptcha"
-            >
-              <img
-                v-if="captchaImage && !isCaptchaLoading"
-                :src="captchaImage"
-                alt="验证码"
-                class="captcha-image"
-              />
-              <span v-else class="captcha-placeholder">...</span>
-            </button>
+            <ZPopover trigger="hover" placement="top" show-arrow>
+              <template #trigger>
+                <span class="popover-trigger-inline">
+                  <button
+                    class="captcha-image-btn"
+                    type="button"
+                    :disabled="isCaptchaLoading"
+                    aria-label="点击刷新验证码"
+                    @click="refreshCaptcha"
+                  >
+                    <img
+                      v-if="captchaImage && !isCaptchaLoading"
+                      :src="captchaImage"
+                      alt="验证码"
+                      class="captcha-image"
+                    />
+                    <span v-else class="captcha-placeholder">...</span>
+                  </button>
+                </span>
+              </template>
+              <span>点击刷新验证码</span>
+            </ZPopover>
           </div>
 
           <div class="action-row action-row--end auth-login-actions">
@@ -750,21 +778,28 @@ function handleAvatarChange(event: Event): void {
               placeholder="计算结果"
               @keydown.enter="submitRegister"
             />
-            <button
-              class="captcha-image-btn"
-              type="button"
-              :disabled="isCaptchaLoading"
-              title="点击刷新验证码"
-              @click="refreshCaptcha"
-            >
-              <img
-                v-if="captchaImage && !isCaptchaLoading"
-                :src="captchaImage"
-                alt="验证码"
-                class="captcha-image"
-              />
-              <span v-else class="captcha-placeholder">...</span>
-            </button>
+            <ZPopover trigger="hover" placement="top" show-arrow>
+              <template #trigger>
+                <span class="popover-trigger-inline">
+                  <button
+                    class="captcha-image-btn"
+                    type="button"
+                    :disabled="isCaptchaLoading"
+                    aria-label="点击刷新验证码"
+                    @click="refreshCaptcha"
+                  >
+                    <img
+                      v-if="captchaImage && !isCaptchaLoading"
+                      :src="captchaImage"
+                      alt="验证码"
+                      class="captcha-image"
+                    />
+                    <span v-else class="captcha-placeholder">...</span>
+                  </button>
+                </span>
+              </template>
+              <span>点击刷新验证码</span>
+            </ZPopover>
           </div>
 
           <div class="action-row action-row--end">
@@ -805,6 +840,10 @@ function handleAvatarChange(event: Event): void {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.popover-trigger-inline {
+  display: inline-flex;
 }
 
 .profile-card,
@@ -999,12 +1038,6 @@ function handleAvatarChange(event: Event): void {
 
 .profile-logout-btn {
   width: 100%;
-  background: var(--danger-light-bg);
-  color: var(--danger-color);
-}
-
-.profile-logout-btn:hover:not(:disabled) {
-  filter: brightness(0.96);
 }
 
 .account-grid {
@@ -1252,6 +1285,11 @@ function handleAvatarChange(event: Event): void {
 
 .dialog-card--github {
   width: min(480px, 88vw);
+}
+
+.dialog-card--password {
+  width: min(420px, calc(100vw - 40px));
+  box-sizing: border-box;
 }
 
 .dialog-header {

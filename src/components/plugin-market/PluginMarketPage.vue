@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ZButton } from 'ztools-ui'
+import { ZButton, ZCheckbox, ZModal } from 'ztools-ui'
 import {
   fetchPluginMarket,
   getCurrentPlatform,
@@ -8,7 +8,7 @@ import {
   getRunningPlugins,
 } from '../../api/pluginMarket'
 import { useToast, Toast as ToastComponent } from '../common/Toast'
-import { ConfirmDialog } from '../common/ConfirmDialog'
+import { useMarketRiskDialog } from '../../app/useMarketRiskDialog'
 import type {
   CategoryInfo,
   CategoryLayoutSection,
@@ -73,13 +73,22 @@ function isInternalPlugin(_name: string): boolean {
 
 const {
   toastState,
-  confirmState,
   success: showSuccessToast,
   error: showErrorToast,
   confirm,
-  handleConfirm,
-  handleCancel,
 } = useToast()
+
+const {
+  marketRiskDialogState,
+  hasDismissedMarketRiskDialog,
+  canSubmitMarketRiskDialog,
+  openMarketRiskDialog,
+  confirmOpenPluginRisk,
+  updateMarketRiskChecklistItem,
+  handleMarketRiskConfirm,
+  handleMarketRiskCancel,
+  handleMarketRiskVisibleChange,
+} = useMarketRiskDialog()
 
 function notifyError(message: string) {
   showErrorToast(message)
@@ -117,8 +126,6 @@ const {
 // Selection state composable
 const {
   isStoreNav,
-  isInstalledNav,
-  isListNav,
   isSearchMode,
   showScrollableContent,
   selectedCategory,
@@ -311,6 +318,7 @@ const actions = usePluginMarketActions({
   notifyError,
   notifySuccess,
   confirmAction,
+  confirmOpenPluginRisk,
   reloadMarket: () => reloadMarket(),
   openPluginByName,
   closePlugin,
@@ -388,7 +396,6 @@ const {
   performUpload: uploadPerformUpload,
   loadUploads: uploadLoadRecords,
   handleDeleteUpload: uploadHandleDelete,
-  resetState: uploadResetState,
 } = uploads
 
 function handleUploadSelectFile(file: File): void {
@@ -414,7 +421,6 @@ const {
   openCategory: navOpenCategory,
   closeCategory: navCloseCategory,
   openPlugin: navOpenPlugin,
-  closePlugin: navClosePlugin,
 } = usePluginMarketNavigation({
   activeNav,
   selectedCategoryKey,
@@ -659,6 +665,11 @@ onMounted(() => {
   syncNotificationStream()
   syncStoreSubInput()
   void reloadMarket()
+  window.ztools.onPluginEnter(() => {
+    if (!hasDismissedMarketRiskDialog.value) {
+      void openMarketRiskDialog()
+    }
+  })
   window.addEventListener('keydown', handleKeydown, true)
 })
 
@@ -677,17 +688,42 @@ onUnmounted(() => {
       :duration="toastState.duration"
       @update:visible="toastState.visible = $event"
     />
-    <ConfirmDialog
-      :visible="confirmState.visible"
-      :title="confirmState.title"
-      :message="confirmState.message"
-      :type="confirmState.type"
-      :confirm-text="confirmState.confirmText"
-      :cancel-text="confirmState.cancelText"
-      @update:visible="confirmState.visible = $event"
-      @confirm="handleConfirm"
-      @cancel="handleCancel"
-    />
+    <ZModal
+      :show="marketRiskDialogState.visible"
+      to="body"
+      :mask-closable="false"
+      :close-on-esc="false"
+      @update:show="handleMarketRiskVisibleChange"
+    >
+      <div class="market-risk-modal" role="dialog" aria-modal="true" :aria-label="marketRiskDialogState.title">
+        <div class="market-risk-modal__header">
+          <h3 class="market-risk-modal__title">{{ marketRiskDialogState.title }}</h3>
+        </div>
+        <div class="market-risk-modal__body">
+          <div class="market-risk-modal__type">请逐项确认以下风险后继续：</div>
+          <div class="market-risk-modal__checklist">
+            <ZCheckbox
+              v-for="item in marketRiskDialogState.items"
+              :key="item.key"
+              :model-value="item.checked"
+              @update:model-value="updateMarketRiskChecklistItem(item.key, $event)"
+            >
+              {{ item.label }}
+            </ZCheckbox>
+          </div>
+        </div>
+        <div class="market-risk-modal__footer">
+          <div class="market-risk-modal__actions">
+            <ZButton :disabled="!canSubmitMarketRiskDialog" @click="handleMarketRiskCancel">
+              {{ marketRiskDialogState.cancelText }}
+            </ZButton>
+            <ZButton type="primary" :disabled="!canSubmitMarketRiskDialog" @click="handleMarketRiskConfirm">
+              {{ marketRiskDialogState.confirmText }}
+            </ZButton>
+          </div>
+        </div>
+      </div>
+    </ZModal>
     <aside class="side-nav">
       <div class="side-nav-header">
         <div class="side-nav-title">邪恶的熊</div>
@@ -1204,6 +1240,60 @@ onUnmounted(() => {
   color: var(--text-secondary);
   font-size: 11px;
 }
+
+.market-risk-modal {
+  width: min(560px, calc(100vw - 32px));
+  border-radius: 16px;
+  background: var(--surface-color, var(--bg-color));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  color: var(--text-color);
+  overflow: hidden;
+}
+
+.market-risk-modal__header {
+  padding: 20px 20px 12px;
+  border-bottom: 1px solid var(--divider-color);
+}
+
+.market-risk-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.market-risk-modal__body {
+  padding: 16px 20px;
+}
+
+.market-risk-modal__type {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.market-risk-modal__checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.market-risk-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--divider-color);
+}
+
+.market-risk-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 
 .content-shell {
   flex: 1;

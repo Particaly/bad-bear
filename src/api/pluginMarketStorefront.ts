@@ -91,6 +91,11 @@ export function adaptPlugin(dto: PluginMarketPluginDto): PluginMarketPlugin {
         (category): category is string => typeof category === 'string' && category.trim().length > 0,
       )
     : []
+  const platform = Array.isArray(dto.platform)
+    ? dto.platform.filter(
+        (item): item is string => typeof item === 'string' && item.trim().length > 0,
+      )
+    : []
 
   return {
     name: dto.name,
@@ -102,9 +107,15 @@ export function adaptPlugin(dto: PluginMarketPluginDto): PluginMarketPlugin {
     logo: normalizeMarketAssetUrl(dto.logo),
     preload: dto.preload,
     features: Array.isArray(dto.features) ? dto.features : [],
+    platform,
     categories,
     categoryFallback: !!dto.categoryFallback,
     downloadUrl: normalizeMarketAssetUrl(dto.downloadUrl),
+    source: dto.source,
+    uploaderUserId: dto.uploaderUserId ?? null,
+    uploaderAccount: dto.uploaderAccount ?? null,
+    uploaderUsername: dto.uploaderUsername ?? null,
+    risk: dto.risk ?? null,
   }
 }
 
@@ -186,9 +197,7 @@ export function buildStorefront(
     categoryEntries.map((category) => [category.key, category]),
   ) as Record<string, PluginMarketStorefrontCategory>
 
-  const navigationCategories = categoryEntries
-    .filter((category) => category.plugins.length > 0)
-    .map(buildCategorySummary)
+  const navigationCategories = categoryEntries.map(buildCategorySummary)
 
   const sections = [] as PluginMarketStorefront['sections']
 

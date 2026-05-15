@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SHOP_API_BASE_URL, saveShopApiRuntimeConfig } from '../config/runtimeConfig'
-import { fetchPluginMarket, getPluginRisk } from './pluginMarketRemote'
+import { fetchPluginMarket, getPluginRisk, streamPluginMarket } from './pluginMarketRemote'
 
 const originalFetch = globalThis.fetch
 
@@ -11,7 +11,44 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
-describe('fetchPluginMarket', () => {
+function sseResponse(frames: string[], options: { splitIndex?: number } = {}): Response {
+  const encoder = new TextEncoder()
+  const payload = frames.join('')
+  const chunks =
+    typeof options.splitIndex === 'number'
+      ? [payload.slice(0, options.splitIndex), payload.slice(options.splitIndex)]
+      : [payload]
+
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        chunks.forEach((chunk) => {
+          if (chunk) {
+            controller.enqueue(encoder.encode(chunk))
+          }
+        })
+        controller.close()
+      },
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    },
+  )
+}
+
+/**
+ * 根据平台构造一次性插件列表 SSE，便于测试缓存、分片解析和逐步快照行为。
+ */
+function buildPluginStreamFrames(pluginName: string, platform = 'win32'): string[] {
+  return [
+    `event: plugins.start\ndata: {"platform":"${platform}","total":1}\n\n`,
+    `event: plugins.item\ndata: {"name":"${pluginName}","version":"1.0.0","title":"${pluginName}","categories":["tools"],"platform":["${platform}"]}\n\n`,
+    `event: plugins.end\ndata: {"platform":"${platform}","total":1,"sent":1}\n\n`,
+  ]
+}
+
+describe('plugin market stream', () => {
   beforeEach(() => {
     window.localStorage.clear()
     saveShopApiRuntimeConfig({
@@ -22,22 +59,11 @@ describe('fetchPluginMarket', () => {
   })
 
   it('reuses cached plugins and categories when latest response is unchanged', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
 
       if (url.endsWith('/api/v1/plugins/latest')) {
         return jsonResponse({ latestAt: '2026-04-11T11:46:20.849Z' })
-      }
-
-      if (url.endsWith('/api/v1/plugins')) {
-        return jsonResponse([
-          {
-            name: 'demo-plugin',
-            version: '1.0.0',
-            title: 'Demo Plugin',
-            categories: ['tools'],
-          },
-        ])
       }
 
       if (url.endsWith('/api/v1/plugins/categories')) {
@@ -50,45 +76,38 @@ describe('fetchPluginMarket', () => {
         ])
       }
 
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        expect(new Headers(init?.headers).get('accept')).toBe('text/event-stream')
+        return sseResponse(buildPluginStreamFrames('demo-plugin'))
+      }
+
       throw new Error(`Unexpected request: ${url}`)
     })
 
     globalThis.fetch = fetchMock as typeof fetch
 
-    const firstResult = await fetchPluginMarket()
-    const secondResult = await fetchPluginMarket()
+    const firstResult = await fetchPluginMarket('win32')
+    const secondResult = await fetchPluginMarket('win32')
 
     expect(firstResult.success).toBe(true)
     expect(secondResult.success).toBe(true)
-    expect(secondResult.data).toHaveLength(1)
-    expect(secondResult.storefront?.categories.tools?.plugins).toEqual([{ name: 'demo-plugin' }])
-    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(secondResult.data?.[0]?.name).toBe('demo-plugin')
+    expect(secondResult.data?.[0]?.platform).toEqual(['win32'])
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       'https://badbear.ydys.cc/api/v1/plugins/latest',
-      'https://badbear.ydys.cc/api/v1/plugins',
       'https://badbear.ydys.cc/api/v1/plugins/categories',
+      'https://badbear.ydys.cc/api/v1/plugins/stream?platform=win32',
       'https://badbear.ydys.cc/api/v1/plugins/latest',
     ])
   })
 
-  it('refreshes plugins and categories when latest response changes', async () => {
-    let latestAt = '2026-04-11T11:46:20.849Z'
+  it('emits progressive snapshots before the stream completes', async () => {
+    const snapshots: Array<{ complete: boolean; names: string[]; categoryTitles: string[] }> = []
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
 
       if (url.endsWith('/api/v1/plugins/latest')) {
-        return jsonResponse({ latestAt })
-      }
-
-      if (url.endsWith('/api/v1/plugins')) {
-        return jsonResponse([
-          {
-            name: latestAt === '2026-04-11T11:46:20.849Z' ? 'demo-plugin' : 'demo-plugin-2',
-            version: latestAt === '2026-04-11T11:46:20.849Z' ? '1.0.0' : '2.0.0',
-            title: latestAt === '2026-04-11T11:46:20.849Z' ? 'Demo Plugin' : 'Demo Plugin 2',
-            categories: ['tools'],
-          },
-        ])
+        return jsonResponse({ latestAt: '2026-04-12T11:46:20.849Z' })
       }
 
       if (url.endsWith('/api/v1/plugins/categories')) {
@@ -96,46 +115,61 @@ describe('fetchPluginMarket', () => {
           {
             key: 'tools',
             title: '工具',
-            list: [latestAt === '2026-04-11T11:46:20.849Z' ? 'demo-plugin' : 'demo-plugin-2'],
+            list: ['demo-plugin'],
           },
         ])
       }
 
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse(buildPluginStreamFrames('demo-plugin'), { splitIndex: 70 })
+      }
+
       throw new Error(`Unexpected request: ${url}`)
     })
 
     globalThis.fetch = fetchMock as typeof fetch
 
-    await fetchPluginMarket()
-    latestAt = '2026-04-12T11:46:20.849Z'
-    const refreshedResult = await fetchPluginMarket()
+    const result = await streamPluginMarket({
+      platform: 'win32',
+      onSnapshot: (snapshot) => {
+        snapshots.push({
+          complete: snapshot.complete,
+          names: (snapshot.data || []).map((plugin) => plugin.name),
+          categoryTitles: Object.values(snapshot.storefront?.categories || {}).map((category) => category.title),
+        })
+      },
+    })
 
-    expect(refreshedResult.data?.[0]?.name).toBe('demo-plugin-2')
-    expect(fetchMock).toHaveBeenCalledTimes(6)
+    expect(result.success).toBe(true)
+    expect(snapshots.length).toBeGreaterThanOrEqual(2)
+    expect(snapshots.some((snapshot) => !snapshot.complete && snapshot.names.includes('demo-plugin'))).toBe(true)
+    expect(snapshots[snapshots.length - 1]).toEqual({
+      complete: true,
+      names: ['demo-plugin'],
+      categoryTitles: ['工具'],
+    })
   })
 
-  it('uses separate caches for different shop api base urls', async () => {
+  it('uses fallback categories before real categories arrive', async () => {
+    let resolveCategories: ((value: Response) => void) | null = null
+    const categoriesPromise = new Promise<Response>((resolve) => {
+      resolveCategories = resolve
+    })
+    const snapshots: Array<{ complete: boolean; categoryTitles: string[] }> = []
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
 
-      if (url === 'https://badbear.ydys.cc/api/v1/plugins/latest') {
-        return jsonResponse({ latestAt: '2026-04-11T11:46:20.849Z' })
-      }
-      if (url === 'https://badbear.ydys.cc/api/v1/plugins') {
-        return jsonResponse([{ name: 'default-plugin', version: '1.0.0', categories: ['tools'] }])
-      }
-      if (url === 'https://badbear.ydys.cc/api/v1/plugins/categories') {
-        return jsonResponse([{ key: 'tools', title: '工具', list: ['default-plugin'] }])
-      }
-
-      if (url === 'https://shop.example.com/api/v1/plugins/latest') {
+      if (url.endsWith('/api/v1/plugins/latest')) {
         return jsonResponse({ latestAt: '2026-04-12T11:46:20.849Z' })
       }
-      if (url === 'https://shop.example.com/api/v1/plugins') {
-        return jsonResponse([{ name: 'other-plugin', version: '2.0.0', categories: ['other'] }])
+
+      if (url.endsWith('/api/v1/plugins/categories')) {
+        return categoriesPromise
       }
-      if (url === 'https://shop.example.com/api/v1/plugins/categories') {
-        return jsonResponse([{ key: 'other', title: '其他', list: ['other-plugin'] }])
+
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse(buildPluginStreamFrames('demo-plugin'))
       }
 
       throw new Error(`Unexpected request: ${url}`)
@@ -143,23 +177,33 @@ describe('fetchPluginMarket', () => {
 
     globalThis.fetch = fetchMock as typeof fetch
 
-    const defaultResult = await fetchPluginMarket()
-    saveShopApiRuntimeConfig({ baseUrl: 'https://shop.example.com' })
-    const otherResult = await fetchPluginMarket()
-    const repeatedOtherResult = await fetchPluginMarket()
+    const streamPromise = streamPluginMarket({
+      platform: 'win32',
+      onSnapshot: (snapshot) => {
+        snapshots.push({
+          complete: snapshot.complete,
+          categoryTitles: Object.values(snapshot.storefront?.categories || {}).map((category) => category.title),
+        })
+      },
+    })
 
-    expect(defaultResult.data?.[0]?.name).toBe('default-plugin')
-    expect(otherResult.data?.[0]?.name).toBe('other-plugin')
-    expect(repeatedOtherResult.data?.[0]?.name).toBe('other-plugin')
-    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
-      'https://badbear.ydys.cc/api/v1/plugins/latest',
-      'https://badbear.ydys.cc/api/v1/plugins',
-      'https://badbear.ydys.cc/api/v1/plugins/categories',
-      'https://shop.example.com/api/v1/plugins/latest',
-      'https://shop.example.com/api/v1/plugins',
-      'https://shop.example.com/api/v1/plugins/categories',
-      'https://shop.example.com/api/v1/plugins/latest',
-    ])
+    await Promise.resolve()
+    await Promise.resolve()
+    resolveCategories?.(
+      jsonResponse([
+        {
+          key: 'tools',
+          title: '工具',
+          list: ['demo-plugin'],
+        },
+      ]),
+    )
+
+    const result = await streamPromise
+
+    expect(result.storefront?.categories.tools?.title).toBe('工具')
+    expect(snapshots.some((snapshot) => snapshot.categoryTitles.includes('Tools'))).toBe(true)
+    expect(snapshots[snapshots.length - 1].categoryTitles).toEqual(['工具'])
   })
 
   it('falls back to plugin categories when categories request fails', async () => {
@@ -170,19 +214,12 @@ describe('fetchPluginMarket', () => {
         return jsonResponse({ latestAt: '2026-04-11T11:46:20.849Z' })
       }
 
-      if (url.endsWith('/api/v1/plugins')) {
-        return jsonResponse([
-          {
-            name: 'demo-plugin',
-            version: '1.0.0',
-            title: 'Demo Plugin',
-            categories: ['tools'],
-          },
-        ])
-      }
-
       if (url.endsWith('/api/v1/plugins/categories')) {
         return new Response('boom', { status: 500 })
+      }
+
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse(buildPluginStreamFrames('demo-plugin'))
       }
 
       throw new Error(`Unexpected request: ${url}`)
@@ -190,29 +227,18 @@ describe('fetchPluginMarket', () => {
 
     globalThis.fetch = fetchMock as typeof fetch
 
-    const result = await fetchPluginMarket()
+    const result = await fetchPluginMarket('win32')
 
     expect(result.storefront?.categories.tools?.title).toBe('Tools')
     expect(result.storefront?.categories.tools?.plugins).toEqual([{ name: 'demo-plugin' }])
   })
 
-  it('requests plugin list directly when latest check fails', async () => {
+  it('requests stream directly when latest check fails', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
 
       if (url.endsWith('/api/v1/plugins/latest')) {
         return new Response('boom', { status: 500 })
-      }
-
-      if (url.endsWith('/api/v1/plugins')) {
-        return jsonResponse([
-          {
-            name: 'demo-plugin',
-            version: '1.0.0',
-            title: 'Demo Plugin',
-            categories: ['tools'],
-          },
-        ])
       }
 
       if (url.endsWith('/api/v1/plugins/categories')) {
@@ -225,18 +251,118 @@ describe('fetchPluginMarket', () => {
         ])
       }
 
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse(buildPluginStreamFrames('demo-plugin'))
+      }
+
       throw new Error(`Unexpected request: ${url}`)
     })
 
     globalThis.fetch = fetchMock as typeof fetch
 
-    const result = await fetchPluginMarket()
+    const result = await fetchPluginMarket('win32')
 
     expect(result.data?.[0]?.name).toBe('demo-plugin')
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       'https://badbear.ydys.cc/api/v1/plugins/latest',
-      'https://badbear.ydys.cc/api/v1/plugins',
       'https://badbear.ydys.cc/api/v1/plugins/categories',
+      'https://badbear.ydys.cc/api/v1/plugins/stream?platform=win32',
+    ])
+  })
+
+  it('uses separate caches for different platforms', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url.endsWith('/api/v1/plugins/latest')) {
+        return jsonResponse({ latestAt: '2026-04-11T11:46:20.849Z' })
+      }
+      if (url.endsWith('/api/v1/plugins/categories')) {
+        return jsonResponse([{ key: 'tools', title: '工具', list: ['shared-plugin'] }])
+      }
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse(buildPluginStreamFrames('windows-plugin', 'win32'))
+      }
+      if (url.endsWith('/api/v1/plugins/stream?platform=darwin')) {
+        return sseResponse(buildPluginStreamFrames('mac-plugin', 'darwin'))
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const windowsResult = await fetchPluginMarket('win32')
+    const macResult = await fetchPluginMarket('darwin')
+    const repeatedWindowsResult = await fetchPluginMarket('win32')
+
+    expect(windowsResult.data?.[0]?.name).toBe('windows-plugin')
+    expect(macResult.data?.[0]?.name).toBe('mac-plugin')
+    expect(repeatedWindowsResult.data?.[0]?.name).toBe('windows-plugin')
+  })
+
+  it('does not cache incomplete streams', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url.endsWith('/api/v1/plugins/latest')) {
+        return jsonResponse({ latestAt: '2026-04-11T11:46:20.849Z' })
+      }
+      if (url.endsWith('/api/v1/plugins/categories')) {
+        return jsonResponse([{ key: 'tools', title: '工具', list: ['demo-plugin'] }])
+      }
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse([
+          'event: plugins.start\n',
+          'data: {"platform":"win32","total":1}\n\n',
+          'event: plugins.item\n',
+          'data: {"name":"demo-plugin","version":"1.0.0","categories":["tools"],"platform":["win32"]}\n\n',
+        ])
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    globalThis.fetch = fetchMock as typeof fetch
+
+    await expect(streamPluginMarket({ platform: 'win32' })).rejects.toThrow('插件商店流提前结束')
+    await expect(streamPluginMarket({ platform: 'win32' })).rejects.toThrow('插件商店流提前结束')
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/api/v1/plugins/stream?platform=win32')),
+    ).toHaveLength(2)
+  })
+
+  it('shows categories with zero plugins in storefront navigation', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url.endsWith('/api/v1/plugins/latest')) {
+        return jsonResponse({ latestAt: '2026-04-11T11:46:20.849Z' })
+      }
+
+      if (url.endsWith('/api/v1/plugins/categories')) {
+        return jsonResponse([
+          { key: 'tools', title: '工具', list: ['demo-plugin'] },
+          { key: 'empty', title: '空分类', list: [] },
+        ])
+      }
+
+      if (url.endsWith('/api/v1/plugins/stream?platform=win32')) {
+        return sseResponse(buildPluginStreamFrames('demo-plugin'))
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const result = await fetchPluginMarket('win32')
+    const navigationSection = result.storefront?.sections.find((section) => section.type === 'navigation')
+
+    expect(navigationSection?.type).toBe('navigation')
+    expect(navigationSection?.categories).toEqual([
+      expect.objectContaining({ key: 'tools', title: '工具', pluginCount: 1 }),
+      expect.objectContaining({ key: 'empty', title: '空分类', pluginCount: 0 }),
     ])
   })
 

@@ -15,8 +15,9 @@ import {
   validateRegisterPayload,
   validateAvatarFile,
 } from './shared'
+import { buildMarketViewState, mergeMarketSnapshots } from './storefront'
 import { resolvePluginInstallPayload } from '../../../api/pluginMarket'
-import type { PluginDetailResponse, PluginMarketUiPlugin } from '../../../types/pluginMarket'
+import type { PluginDetailResponse, PluginMarketFetchResponse, PluginMarketUiPlugin } from '../../../types/pluginMarket'
 import type { LoginRequest, RegisterRequest } from '../../../types/auth'
 
 describe('plugin market page helpers', () => {
@@ -98,6 +99,117 @@ describe('plugin market page helpers', () => {
 
     expect(payload.version).toBe('2.0.0')
     expect(payload.downloadUrl).toContain('/demo-plugin/2.0.0/abc123/download')
+  })
+
+  it('merges previous market snapshot until stream completes', () => {
+    const previous: PluginMarketFetchResponse = {
+      success: true,
+      data: [
+        { name: 'old-plugin', version: '1.0.0', title: 'Old' },
+        { name: 'shared-plugin', version: '1.0.0', title: 'Old Shared' },
+      ],
+      storefront: {
+        sections: [],
+        categories: {},
+        categoryLayouts: {},
+      },
+    }
+    const incoming: PluginMarketFetchResponse = {
+      success: true,
+      data: [
+        { name: 'shared-plugin', version: '2.0.0', title: 'New Shared' },
+        { name: 'new-plugin', version: '1.0.0', title: 'New' },
+      ],
+      storefront: {
+        sections: [],
+        categories: {},
+        categoryLayouts: {},
+      },
+    }
+
+    const merged = mergeMarketSnapshots(previous, incoming)
+
+    expect(merged.data?.map((plugin) => plugin.name)).toEqual([
+      'old-plugin',
+      'shared-plugin',
+      'new-plugin',
+    ])
+    expect(merged.data?.find((plugin) => plugin.name === 'shared-plugin')?.version).toBe('2.0.0')
+  })
+
+  it('keeps zero-plugin categories in market view state', () => {
+    const viewState = buildMarketViewState(
+      {
+        success: true,
+        data: [
+          {
+            name: 'demo-plugin',
+            version: '1.0.0',
+            title: 'Demo Plugin',
+            platform: ['win32'],
+            categories: ['tools'],
+          },
+        ],
+        storefront: {
+          sections: [
+            {
+              type: 'navigation',
+              key: 'categories',
+              title: '分类',
+              categories: [
+                { key: 'tools', title: '工具', showDescription: false, pluginCount: 1 },
+                { key: 'empty', title: '空分类', showDescription: false, pluginCount: 0 },
+              ],
+            },
+            {
+              type: 'fixed',
+              key: 'all-plugins',
+              title: '全部插件',
+              plugins: [{ name: 'demo-plugin' }],
+            },
+          ],
+          categories: {
+            tools: {
+              key: 'tools',
+              title: '工具',
+              plugins: [{ name: 'demo-plugin' }],
+            },
+            empty: {
+              key: 'empty',
+              title: '空分类',
+              plugins: [],
+            },
+          },
+          categoryLayouts: {},
+        },
+      },
+      [],
+      [],
+      'win32',
+    )
+
+    expect(viewState.storefrontCategories.empty).toEqual(
+      expect.objectContaining({ key: 'empty', title: '空分类', plugins: [] }),
+    )
+    expect(viewState.storefrontSections).toEqual([
+      {
+        type: 'navigation',
+        key: 'categories',
+        title: '分类',
+        categories: [
+          expect.objectContaining({ key: 'tools', title: '工具', pluginCount: 1 }),
+          expect.objectContaining({ key: 'empty', title: '空分类', pluginCount: 0 }),
+        ],
+      },
+      {
+        type: 'fixed',
+        key: 'all-plugins',
+        title: '全部插件',
+        plugins: [
+          expect.objectContaining({ name: 'demo-plugin' }),
+        ],
+      },
+    ])
   })
 
   describe('validation', () => {
@@ -364,8 +476,8 @@ describe('plugin market page helpers', () => {
         },
       }
       const target = buildCurrentPluginDownloadTarget(plugin, null)
-      expect(target?.downloadMode).toBe('latest')
       expect(target?.version).toBe('1.0.0')
+      expect(target?.downloadMode).toBe('latest')
     })
   })
 })

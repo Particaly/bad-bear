@@ -55,14 +55,12 @@ export function buildMarketViewState(
     Object.entries(storefront.categories).forEach(
       ([key, category]: [string, PluginMarketStorefrontCategory]) => {
         const categoryPlugins = resolvePluginList(category.plugins, nextPluginMap)
-        if (categoryPlugins.length > 0) {
-          nextCategories[key] = {
-            key: category.key,
-            title: category.title,
-            description: category.description,
-            icon: category.icon,
-            plugins: categoryPlugins,
-          }
+        nextCategories[key] = {
+          key: category.key,
+          title: category.title,
+          description: category.description,
+          icon: category.icon,
+          plugins: categoryPlugins,
         }
       },
     )
@@ -79,10 +77,7 @@ export function buildMarketViewState(
     }
 
     if (section.type === 'navigation') {
-      const categories = (section.categories || []).filter(
-        (category: StorefrontCategorySummary) =>
-          (nextCategories[category.key]?.plugins.length || 0) > 0,
-      )
+      const categories = section.categories || []
 
       if (categories.length > 0) {
         nextSections.push({
@@ -118,4 +113,40 @@ export function buildMarketViewState(
       runningSet,
     ),
   }
+}
+
+/**
+ * 在流式刷新尚未结束时，用新快照覆盖同名插件并保留旧内容，避免页面因为未到达的条目而闪烁。
+ */
+export function mergeMarketSnapshots(
+  previous: PluginMarketFetchResponse | null,
+  incoming: PluginMarketFetchResponse,
+): PluginMarketFetchResponse {
+  if (!previous?.success || !previous.data?.length) {
+    return incoming
+  }
+
+  const mergedPlugins = new Map<string, PluginMarketPlugin>()
+  ;(previous.data || []).forEach((plugin) => {
+    mergedPlugins.set(plugin.name, plugin)
+  })
+  ;(incoming.data || []).forEach((plugin) => {
+    mergedPlugins.set(plugin.name, plugin)
+  })
+
+  return {
+    success: incoming.success,
+    error: incoming.error,
+    data: Array.from(mergedPlugins.values()),
+    storefront: incoming.storefront || previous.storefront,
+  }
+}
+
+/**
+ * 流结束后直接采用最终快照，让已下线插件和无效分类在一次收敛中被清理掉。
+ */
+export function finalizeMarketSnapshot(
+  snapshot: PluginMarketFetchResponse,
+): PluginMarketFetchResponse {
+  return snapshot
 }

@@ -33,14 +33,46 @@ export interface PluginMarketPluginDto {
   logo?: string
   preload?: string
   features?: PluginFeature[]
+  platform?: Platform[]
   categories?: string[]
   categoryFallback?: boolean
   downloadUrl?: string
+  source?: PluginReleaseSource
+  uploaderUserId?: string | null
+  uploaderAccount?: string | null
+  uploaderUsername?: string | null
+  risk?: PluginMarketListRiskInfo | null
 }
 
 export interface PluginMarketPluginReference {
   name: string
 }
+
+export interface PluginMarketListRiskSummary {
+  level?: string | null
+  summary?: string | null
+  filePath?: string | null
+  reasons?: string[]
+  warningsCn?: string[]
+}
+
+export interface PluginMarketListRiskInfo {
+  riskLevel?: string | null
+  riskSummary?: PluginMarketListRiskSummary | null
+  warningsCn?: string[]
+  reviewDecision?: string | null
+}
+
+export interface PluginMarketStreamSnapshot extends PluginMarketFetchResponse {
+  complete: boolean
+}
+
+export interface StreamPluginMarketOptions {
+  platform: Platform
+  signal?: AbortSignal
+  onSnapshot?: (snapshot: PluginMarketStreamSnapshot) => void
+}
+
 
 export interface PluginMarketPlugin {
   name: string
@@ -61,6 +93,11 @@ export interface PluginMarketPlugin {
   preload?: string
   categories?: string[]
   categoryFallback?: boolean
+  source?: PluginReleaseSource
+  uploaderUserId?: string | null
+  uploaderAccount?: string | null
+  uploaderUsername?: string | null
+  risk?: PluginMarketListRiskInfo | null
 }
 
 export interface InjectedPluginRecord {

@@ -73,7 +73,9 @@ describe('installed plugin actions', () => {
       updateMarketRiskChecklistItem,
       handleMarketRiskCancel,
     } = useMarketRiskDialog()
-    const plugin = createPlugin({ marketPlugin: { id: 1 } as PluginMarketUiPlugin['marketPlugin'] })
+    const plugin = createPlugin({
+      marketPlugin: { name: 'demo-plugin', version: '1.0.0' } as PluginMarketUiPlugin['marketPlugin'],
+    })
 
     const firstConfirmation = confirmOpenPluginRisk(plugin)
 
@@ -98,7 +100,9 @@ describe('installed plugin actions', () => {
       updateMarketRiskChecklistItem,
       handleMarketRiskCancel,
     } = useMarketRiskDialog()
-    const plugin = createPlugin({ marketPlugin: { id: 1 } as PluginMarketUiPlugin['marketPlugin'] })
+    const plugin = createPlugin({
+      marketPlugin: { name: 'demo-plugin', version: '1.0.0' } as PluginMarketUiPlugin['marketPlugin'],
+    })
     const firstConfirmation = confirmOpenPluginRisk(plugin)
 
     for (const item of marketRiskDialogState.value.items) {

@@ -8,6 +8,7 @@ export {
   getPluginComments,
   createPluginComment,
   fetchPluginMarket,
+  streamPluginMarket,
   checkPluginUploadHash,
   getMyPluginUploads,
   deleteMyPluginUpload,

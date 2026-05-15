@@ -2,10 +2,10 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ZButton, ZCheckbox, ZModal } from 'ztools-ui'
 import {
-  fetchPluginMarket,
   getCurrentPlatform,
   getInstalledPlugins,
   getRunningPlugins,
+  streamPluginMarket,
 } from '../../api/pluginMarket'
 import { useToast, Toast as ToastComponent } from '../common/Toast'
 import { useMarketRiskDialog } from '../../app/useMarketRiskDialog'
@@ -17,6 +17,7 @@ import type {
   PluginDetailVersion,
   PluginMarketFetchResponse,
   PluginMarketSectionModel,
+  PluginMarketStreamSnapshot,
   PluginMarketUiPlugin,
   StorefrontCategorySummary,
 } from '../../types/pluginMarket'
@@ -41,7 +42,11 @@ import { usePluginMarketSelection } from './page/usePluginMarketSelection'
 import { usePluginMarketUploads } from './page/usePluginMarketUploads'
 import { usePluginMarketRuntime } from './page/usePluginMarketRuntime'
 import { useStoreSubInput } from './page/useStoreSubInput'
-import { buildMarketViewState } from './page/storefront'
+import {
+  buildMarketViewState,
+  finalizeMarketSnapshot,
+  mergeMarketSnapshots,
+} from './page/storefront'
 
 interface SideNavItem {
   key: ActiveNav
@@ -52,6 +57,9 @@ interface SideNavItem {
 
 const activeNav = ref<ActiveNav>('store')
 const isLoading = ref(true)
+const isRefreshingMarket = ref(false)
+const isMarketStreamActive = ref(false)
+const hasLoadedMarketOnce = ref(false)
 const loadError = ref('')
 const canUseInternalPluginApis = ref(true)
 const plugins = ref<PluginMarketUiPlugin[]>([])
@@ -66,6 +74,10 @@ const selectedPluginName = ref<string | null>(null)
 const searchQuery = ref('')
 let reloadSelectedPluginDetailRef: () => Promise<void> = async () => {}
 let refreshNotificationsAfterAuthChangeRef: () => Promise<void> = async () => {}
+let marketReloadSessionId = 0
+let marketReloadAbortController: AbortController | null = null
+let stableMarketResponse: PluginMarketFetchResponse | null = null
+let latestStreamMarketResponse: PluginMarketStreamSnapshot | null = null
 
 function isInternalPlugin(_name: string): boolean {
   return false
@@ -140,84 +152,232 @@ const {
   storefrontCategories,
 })
 
-async function reloadMarket() {
-  isLoading.value = true
-  loadError.value = ''
+/**
+ * 把当前市场快照与宿主插件状态统一投影到页面响应式状态，并只在最终快照阶段清理失效选择项。
+ */
+function applyMarketResponse(
+  marketResult: PluginMarketFetchResponse,
+  nextInstalledPlugins: InstalledPlugin[],
+  nextRunningPluginPaths: string[],
+  currentPlatform: string,
+  options: { final: boolean },
+): void {
+  const viewState = buildMarketViewState(
+    marketResult,
+    nextInstalledPlugins,
+    nextRunningPluginPaths,
+    currentPlatform,
+  )
 
-  const marketTask = fetchPluginMarket().catch((): PluginMarketFetchResponse => ({
-    success: false,
-    error: '无法连接到商店服务器',
-    data: [],
-    storefront: undefined,
-  }))
-  const runningTask = getRunningPlugins().catch((): string[] => [])
+  plugins.value = viewState.uiPlugins
+  installedPlugins.value = nextInstalledPlugins
+  installedViewPlugins.value = viewState.installedViewPlugins
+  runningPluginPaths.value = nextRunningPluginPaths
+  storefrontCategories.value = viewState.storefrontCategories
+  storefrontSections.value = viewState.storefrontSections
+  categoryLayouts.value = viewState.categoryLayouts
+
+  if (!marketResult.success && viewState.uiPlugins.length === 0) {
+    loadError.value = '无法连接到商店服务器'
+  } else if (viewState.uiPlugins.length > 0 || Object.keys(viewState.storefrontCategories).length > 0) {
+    loadError.value = ''
+    hasLoadedMarketOnce.value = true
+  }
+
+  if (options.final && selectedCategoryKey.value && !viewState.storefrontCategories[selectedCategoryKey.value]) {
+    selectedCategoryKey.value = null
+  }
+
+  const hasSelectedPlugin = selectedPluginName.value
+    ? viewState.uiPlugins.some((plugin) => plugin.name === selectedPluginName.value) ||
+      viewState.installedViewPlugins.some((plugin) => plugin.name === selectedPluginName.value)
+    : false
+
+  if (options.final && selectedPluginName.value && !hasSelectedPlugin) {
+    selectedPluginName.value = null
+  }
+}
+
+/**
+ * 根据流式快照阶段决定是合并旧内容还是收敛最终结果，从而避免刷新过程中的白屏和详情闪退。
+ */
+function renderMarketSnapshot(
+  snapshot: PluginMarketStreamSnapshot,
+  nextInstalledPlugins: InstalledPlugin[],
+  nextRunningPluginPaths: string[],
+  currentPlatform: string,
+): void {
+  latestStreamMarketResponse = snapshot
+  const marketResult = snapshot.complete
+    ? finalizeMarketSnapshot(snapshot)
+    : mergeMarketSnapshots(stableMarketResponse, snapshot)
+
+  applyMarketResponse(marketResult, nextInstalledPlugins, nextRunningPluginPaths, currentPlatform, {
+    final: snapshot.complete,
+  })
+
+  if (snapshot.complete) {
+    stableMarketResponse = marketResult
+  }
+}
+
+/**
+ * 重新加载插件商店，并在首批流式条目到达后立刻刷新页面；如果刷新失败，则尽量保留已有稳定内容。
+ */
+async function reloadMarket() {
+  const currentPlatform = getCurrentPlatform()
+  const sessionId = marketReloadSessionId + 1
+  marketReloadSessionId = sessionId
+  marketReloadAbortController?.abort()
+  const controller = new AbortController()
+  marketReloadAbortController = controller
+
+  isLoading.value = !hasLoadedMarketOnce.value
+  isRefreshingMarket.value = true
+  isMarketStreamActive.value = true
+  loadError.value = ''
+  latestStreamMarketResponse = null
+
+  let resolvedInstalledPlugins = installedPlugins.value
+  let resolvedRunningPluginPaths = runningPluginPaths.value
+
   const installedTask = getInstalledPlugins()
     .then((items) => {
+      if (sessionId !== marketReloadSessionId || controller.signal.aborted) {
+        return items
+      }
+
       canUseInternalPluginApis.value = true
+      resolvedInstalledPlugins = items
+      if (latestStreamMarketResponse) {
+        renderMarketSnapshot(
+          latestStreamMarketResponse,
+          resolvedInstalledPlugins,
+          resolvedRunningPluginPaths,
+          currentPlatform,
+        )
+      }
       return items
     })
     .catch((error) => {
       if (isPluginHostPermissionDeniedError(error)) {
         canUseInternalPluginApis.value = false
+        resolvedInstalledPlugins = []
+        if (sessionId === marketReloadSessionId && latestStreamMarketResponse) {
+          renderMarketSnapshot(
+            latestStreamMarketResponse,
+            resolvedInstalledPlugins,
+            resolvedRunningPluginPaths,
+            currentPlatform,
+          )
+        }
         return []
       }
 
       throw error
     })
 
+  const runningTask = getRunningPlugins()
+    .catch((): string[] => [])
+    .then((items) => {
+      if (sessionId !== marketReloadSessionId || controller.signal.aborted) {
+        return items
+      }
+
+      resolvedRunningPluginPaths = items
+      if (latestStreamMarketResponse) {
+        renderMarketSnapshot(
+          latestStreamMarketResponse,
+          resolvedInstalledPlugins,
+          resolvedRunningPluginPaths,
+          currentPlatform,
+        )
+      }
+      return items
+    })
+
   try {
+    const marketTask = streamPluginMarket({
+      platform: currentPlatform,
+      signal: controller.signal,
+      onSnapshot: (snapshot) => {
+        if (sessionId !== marketReloadSessionId || controller.signal.aborted) {
+          return
+        }
+
+        renderMarketSnapshot(snapshot, resolvedInstalledPlugins, resolvedRunningPluginPaths, currentPlatform)
+      },
+    }).catch((): PluginMarketFetchResponse => ({
+      success: false,
+      error: '无法连接到商店服务器',
+      data: [],
+      storefront: undefined,
+    }))
+
     const [marketResponse, nextInstalledPlugins, nextRunningPluginPaths] = await Promise.all([
       marketTask,
       installedTask,
       runningTask,
     ])
 
-    const marketResult = marketResponse
-    const currentPlatform = getCurrentPlatform()
-    const viewState = buildMarketViewState(
-      marketResult,
+    if (sessionId !== marketReloadSessionId || controller.signal.aborted) {
+      return
+    }
+
+    if (latestStreamMarketResponse) {
+      if (!marketResponse.success) {
+        loadError.value = '无法连接到商店服务器'
+      }
+      return
+    }
+
+    if (!marketResponse.success && hasLoadedMarketOnce.value && stableMarketResponse) {
+      loadError.value = '无法连接到商店服务器'
+      applyMarketResponse(
+        stableMarketResponse,
+        nextInstalledPlugins,
+        nextRunningPluginPaths,
+        currentPlatform,
+        { final: false },
+      )
+      return
+    }
+
+    applyMarketResponse(
+      marketResponse,
       nextInstalledPlugins,
       nextRunningPluginPaths,
       currentPlatform,
+      { final: true },
     )
-
-    plugins.value = viewState.uiPlugins
-    installedPlugins.value = nextInstalledPlugins
-    installedViewPlugins.value = viewState.installedViewPlugins
-    runningPluginPaths.value = nextRunningPluginPaths
-    storefrontCategories.value = viewState.storefrontCategories
-    storefrontSections.value = viewState.storefrontSections
-    categoryLayouts.value = viewState.categoryLayouts
-
-
-    if (!marketResult.success && viewState.uiPlugins.length === 0) {
-      loadError.value = '无法连接到商店服务器'
-    }
-
-    if (selectedCategoryKey.value && !viewState.storefrontCategories[selectedCategoryKey.value]) {
-      selectedCategoryKey.value = null
-    }
-
-    const hasSelectedPlugin = selectedPluginName.value
-      ? viewState.uiPlugins.some((plugin) => plugin.name === selectedPluginName.value) ||
-        viewState.installedViewPlugins.some((plugin) => plugin.name === selectedPluginName.value)
-      : false
-
-    if (selectedPluginName.value && !hasSelectedPlugin) {
-      selectedPluginName.value = null
+    if (marketResponse.success) {
+      stableMarketResponse = marketResponse
     }
   } catch (error) {
+    if (controller.signal.aborted || sessionId !== marketReloadSessionId) {
+      return
+    }
+
     console.error('[PluginMarket] 加载失败:', error)
     loadError.value = '无法连接到商店服务器'
-    plugins.value = []
-    installedPlugins.value = []
-    installedViewPlugins.value = []
-    runningPluginPaths.value = []
-    storefrontSections.value = []
-    storefrontCategories.value = {}
-    categoryLayouts.value = {}
+    if (!hasLoadedMarketOnce.value) {
+      plugins.value = []
+      installedPlugins.value = []
+      installedViewPlugins.value = []
+      runningPluginPaths.value = []
+      storefrontSections.value = []
+      storefrontCategories.value = {}
+      categoryLayouts.value = {}
+    }
   } finally {
-    isLoading.value = false
+    if (sessionId === marketReloadSessionId) {
+      isMarketStreamActive.value = false
+      isRefreshingMarket.value = false
+      isLoading.value = false
+      if (marketReloadAbortController === controller) {
+        marketReloadAbortController = null
+      }
+    }
   }
 }
 
@@ -270,8 +430,10 @@ const installedPluginMap = computed(
 )
 const canInstallFromMarket = computed(() => canUseInternalPluginApis.value)
 const canStopPlugins = computed(() => typeof window.ztools?.internal?.killPlugin === 'function')
-
 const hasStorefront = computed(() => storefrontSections.value.length > 0)
+const showBlockingMarketLoading = computed(
+  () => isLoading.value && !hasLoadedMarketOnce.value && activeNav.value === 'store',
+)
 const filteredPlugins = computed(() =>
   weightedSearch(plugins.value, searchQuery.value, [
     { value: (plugin) => plugin.title || plugin.name || '', weight: 10 },
@@ -429,7 +591,7 @@ const {
   clearSearchQuery,
   refreshNavData: (nav) => {
     if (nav === 'store' || nav === 'installed') {
-      if (isLoading.value) {
+      if (isRefreshingMarket.value) {
         return Promise.resolve()
       }
       return reloadMarket()
@@ -647,9 +809,8 @@ watch(activeNav, (nav) => {
   syncStoreSubInput()
   syncNotificationStream()
 
-  // Refresh data for the current nav tab
   if (nav === 'store' || nav === 'installed') {
-    if (!isLoading.value) {
+    if (!isRefreshingMarket.value) {
       void reloadMarket()
     }
   } else if (nav === 'notifications') {
@@ -674,6 +835,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  marketReloadAbortController?.abort()
   unregisterSubInput()
   window.removeEventListener('keydown', handleKeydown, true)
 })
@@ -761,12 +923,17 @@ onUnmounted(() => {
       <div class="content-body">
         <Transition name="list-slide">
           <div v-show="showScrollableContent" class="scrollable-content">
-            <div v-if="isLoading" class="loading-state">
+            <div v-if="showBlockingMarketLoading" class="loading-state">
               <div class="loading-spinner"></div>
               <span>加载中...</span>
             </div>
 
             <template v-else-if="activeNav === 'store'">
+              <div v-if="isRefreshingMarket" class="market-refresh-indicator">
+                <div class="loading-spinner market-refresh-spinner"></div>
+                <span>{{ isMarketStreamActive ? '商店内容更新中…' : '正在整理商店内容…' }}</span>
+              </div>
+
               <template v-if="isSearchMode">
                 <div v-if="filteredPlugins.length === 0" class="empty-state">
                   <svg
@@ -1515,6 +1682,21 @@ onUnmounted(() => {
 .loading-state span {
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.market-refresh-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.market-refresh-spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
 }
 
 .empty-state {

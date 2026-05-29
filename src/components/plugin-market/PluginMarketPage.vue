@@ -2,12 +2,13 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ZButton, ZCheckbox, ZModal } from 'ztools-ui'
 import {
+  checkPluginUpdates,
   getCurrentPlatform,
   getInstalledPlugins,
   getRunningPlugins,
   streamPluginMarket,
 } from '../../api/pluginMarket'
-import { useToast, Toast as ToastComponent } from '../common/Toast'
+import { useToast } from '../common/Toast'
 import { useMarketRiskDialog } from '../../app/useMarketRiskDialog'
 import type {
   CategoryInfo,
@@ -19,6 +20,7 @@ import type {
   PluginMarketSectionModel,
   PluginMarketStreamSnapshot,
   PluginMarketUiPlugin,
+  PluginUpdateCheckRequestItem,
   StorefrontCategorySummary,
 } from '../../types/pluginMarket'
 import AccountPanel from './AccountPanel.vue'
@@ -65,6 +67,7 @@ const canUseInternalPluginApis = ref(true)
 const plugins = ref<PluginMarketUiPlugin[]>([])
 const installedPlugins = ref<InstalledPlugin[]>([])
 const installedViewPlugins = ref<InstalledViewPlugin[]>([])
+const installedUpdateHashes = ref<Record<string, string>>({})
 const runningPluginPaths = ref<string[]>([])
 const storefrontSections = ref<PluginMarketSectionModel[]>([])
 const storefrontCategories = ref<Record<string, CategoryInfo>>({})
@@ -84,7 +87,6 @@ function isInternalPlugin(_name: string): boolean {
 }
 
 const {
-  toastState,
   success: showSuccessToast,
   error: showErrorToast,
   confirm,
@@ -124,6 +126,47 @@ function openPluginByName(name: string) {
   selectedPluginName.value = name
 }
 
+/**
+ * 校验宿主返回的 hash 是否符合更新检查接口要求的 sha256 格式。
+ */
+function isSha256Hash(hash: unknown): hash is string {
+  return typeof hash === 'string' && /^sha256:[0-9a-f]{64}$/.test(hash)
+}
+
+/**
+ * 只使用宿主注入的合法本地包 hash 构造更新检查请求，缺失 hash 的插件由服务端查询流程跳过。
+ */
+function buildPluginUpdateCheckItems(pluginsToCheck: InstalledPlugin[]): PluginUpdateCheckRequestItem[] {
+  return pluginsToCheck
+    .filter((plugin) => isSha256Hash(plugin.hash))
+    .map((plugin) => ({
+      name: plugin.name,
+      hash: plugin.hash,
+    }))
+}
+
+/**
+ * 查询可更新插件并转换为按插件名索引的 latestHash 表，失败时不影响已安装列表加载。
+ */
+async function loadInstalledUpdateHashes(pluginsToCheck: InstalledPlugin[]): Promise<Record<string, string>> {
+  const items = buildPluginUpdateCheckItems(pluginsToCheck)
+  if (items.length === 0) {
+    return {}
+  }
+
+  try {
+    const updates = await checkPluginUpdates(items)
+    return Object.fromEntries(
+      updates
+        .filter((item) => item.name && isSha256Hash(item.latestHash))
+        .map((item) => [item.name, item.latestHash]),
+    )
+  } catch (error) {
+    console.warn('[PluginMarket] 检查插件更新失败:', error)
+    return {}
+  }
+}
+
 // Sub-input composable for market search
 const {
   syncStoreSubInput,
@@ -160,6 +203,7 @@ function applyMarketResponse(
   nextInstalledPlugins: InstalledPlugin[],
   nextRunningPluginPaths: string[],
   currentPlatform: string,
+  nextUpdateHashes: Record<string, string>,
   options: { final: boolean },
 ): void {
   const viewState = buildMarketViewState(
@@ -167,11 +211,13 @@ function applyMarketResponse(
     nextInstalledPlugins,
     nextRunningPluginPaths,
     currentPlatform,
+    new Map(Object.entries(nextUpdateHashes)),
   )
 
   plugins.value = viewState.uiPlugins
   installedPlugins.value = nextInstalledPlugins
   installedViewPlugins.value = viewState.installedViewPlugins
+  installedUpdateHashes.value = nextUpdateHashes
   runningPluginPaths.value = nextRunningPluginPaths
   storefrontCategories.value = viewState.storefrontCategories
   storefrontSections.value = viewState.storefrontSections
@@ -206,13 +252,14 @@ function renderMarketSnapshot(
   nextInstalledPlugins: InstalledPlugin[],
   nextRunningPluginPaths: string[],
   currentPlatform: string,
+  nextUpdateHashes: Record<string, string>,
 ): void {
   latestStreamMarketResponse = snapshot
   const marketResult = snapshot.complete
     ? finalizeMarketSnapshot(snapshot)
     : mergeMarketSnapshots(stableMarketResponse, snapshot)
 
-  applyMarketResponse(marketResult, nextInstalledPlugins, nextRunningPluginPaths, currentPlatform, {
+  applyMarketResponse(marketResult, nextInstalledPlugins, nextRunningPluginPaths, currentPlatform, nextUpdateHashes, {
     final: snapshot.complete,
   })
 
@@ -240,38 +287,44 @@ async function reloadMarket() {
 
   let resolvedInstalledPlugins = installedPlugins.value
   let resolvedRunningPluginPaths = runningPluginPaths.value
+  let resolvedUpdateHashes = installedUpdateHashes.value
 
   const installedTask = getInstalledPlugins()
-    .then((items) => {
+    .then(async (items) => {
+      const nextUpdateHashes = await loadInstalledUpdateHashes(items)
       if (sessionId !== marketReloadSessionId || controller.signal.aborted) {
-        return items
+        return { items, updateHashes: nextUpdateHashes }
       }
 
       canUseInternalPluginApis.value = true
       resolvedInstalledPlugins = items
+      resolvedUpdateHashes = nextUpdateHashes
       if (latestStreamMarketResponse) {
         renderMarketSnapshot(
           latestStreamMarketResponse,
           resolvedInstalledPlugins,
           resolvedRunningPluginPaths,
           currentPlatform,
+          resolvedUpdateHashes,
         )
       }
-      return items
+      return { items, updateHashes: nextUpdateHashes }
     })
     .catch((error) => {
       if (isPluginHostPermissionDeniedError(error)) {
         canUseInternalPluginApis.value = false
         resolvedInstalledPlugins = []
+        resolvedUpdateHashes = {}
         if (sessionId === marketReloadSessionId && latestStreamMarketResponse) {
           renderMarketSnapshot(
             latestStreamMarketResponse,
             resolvedInstalledPlugins,
             resolvedRunningPluginPaths,
             currentPlatform,
+            resolvedUpdateHashes,
           )
         }
-        return []
+        return { items: [], updateHashes: {} }
       }
 
       throw error
@@ -291,6 +344,7 @@ async function reloadMarket() {
           resolvedInstalledPlugins,
           resolvedRunningPluginPaths,
           currentPlatform,
+          resolvedUpdateHashes,
         )
       }
       return items
@@ -305,7 +359,13 @@ async function reloadMarket() {
           return
         }
 
-        renderMarketSnapshot(snapshot, resolvedInstalledPlugins, resolvedRunningPluginPaths, currentPlatform)
+        renderMarketSnapshot(
+          snapshot,
+          resolvedInstalledPlugins,
+          resolvedRunningPluginPaths,
+          currentPlatform,
+          resolvedUpdateHashes,
+        )
       },
     }).catch((): PluginMarketFetchResponse => ({
       success: false,
@@ -335,9 +395,10 @@ async function reloadMarket() {
       loadError.value = '无法连接到商店服务器'
       applyMarketResponse(
         stableMarketResponse,
-        nextInstalledPlugins,
+        nextInstalledPlugins.items,
         nextRunningPluginPaths,
         currentPlatform,
+        nextInstalledPlugins.updateHashes,
         { final: false },
       )
       return
@@ -345,9 +406,10 @@ async function reloadMarket() {
 
     applyMarketResponse(
       marketResponse,
-      nextInstalledPlugins,
+      nextInstalledPlugins.items,
       nextRunningPluginPaths,
       currentPlatform,
+      nextInstalledPlugins.updateHashes,
       { final: true },
     )
     if (marketResponse.success) {
@@ -491,7 +553,6 @@ const {
   installedBusyPluginName,
   installedBusyAction,
   selectedPluginBusyAction,
-  canUpgrade,
   handleOpenPlugin,
   handleInstall,
   handleInstallLatest,
@@ -633,6 +694,9 @@ function handleSelectPluginDetailVersion(version: PluginDetailVersion): void {
   selectPluginDetailVersion(version)
 }
 
+/**
+ * 从详情页历史版本入口安装指定构建，并在安装流程结束后刷新当前详情状态。
+ */
 function handleInstallPluginDetailVersion(version: PluginDetailVersion): void {
   selectPluginDetailVersion(version)
   if (!mergedSelectedPlugin.value) {
@@ -640,11 +704,15 @@ function handleInstallPluginDetailVersion(version: PluginDetailVersion): void {
   }
 
   if (mergedSelectedPlugin.value.installed) {
-    void handleUpgrade(mergedSelectedPlugin.value)
+    void handleUpgrade(mergedSelectedPlugin.value).then(() => {
+      void reloadSelectedPluginDetailRef()
+    })
     return
   }
 
-  void handleInstall(mergedSelectedPlugin.value)
+  void handleInstall(mergedSelectedPlugin.value).then(() => {
+    void reloadSelectedPluginDetailRef()
+  })
 }
 
 const notificationBadgeText = computed(() => {
@@ -843,13 +911,6 @@ onUnmounted(() => {
 
 <template>
   <div class="plugin-market">
-    <ToastComponent
-      :visible="toastState.visible"
-      :message="toastState.message"
-      :type="toastState.type"
-      :duration="toastState.duration"
-      @update:visible="toastState.visible = $event"
-    />
     <ZModal
       :show="marketRiskDialogState.visible"
       to="body"
@@ -959,12 +1020,10 @@ onUnmounted(() => {
                     :key="plugin.name"
                     :plugin="plugin"
                     :installing-plugin="marketBusyPluginName"
-                    :can-upgrade="canUpgrade(plugin)"
                     :can-install-from-market="canInstallFromMarket"
                     @click="openPlugin(plugin)"
                     @open="handleOpenPlugin(plugin)"
                     @download="handleInstall(plugin)"
-                    @upgrade="handleUpgrade(plugin)"
                   />
                 </div>
               </template>
@@ -1020,12 +1079,10 @@ onUnmounted(() => {
                           :key="plugin.name"
                           :plugin="plugin"
                           :installing-plugin="marketBusyPluginName"
-                          :can-upgrade="canUpgrade(plugin)"
                           :can-install-from-market="canInstallFromMarket"
                           @click="openPlugin(plugin)"
                           @open="handleOpenPlugin(plugin)"
                           @download="handleInstall(plugin)"
-                          @upgrade="handleUpgrade(plugin)"
                         />
                       </div>
                     </div>
@@ -1062,12 +1119,10 @@ onUnmounted(() => {
                     :key="plugin.name"
                     :plugin="plugin"
                     :installing-plugin="marketBusyPluginName"
-                    :can-upgrade="canUpgrade(plugin)"
                     :can-install-from-market="canInstallFromMarket"
                     @click="openPlugin(plugin)"
                     @open="handleOpenPlugin(plugin)"
                     @download="handleInstall(plugin)"
-                    @upgrade="handleUpgrade(plugin)"
                   />
                 </div>
               </template>
@@ -1098,6 +1153,7 @@ onUnmounted(() => {
                   @click="openPlugin(plugin)"
                   @open="handleOpenPlugin(plugin)"
                   @open-folder="handleOpenFolder(plugin)"
+                  @upgrade="handleUpgrade(plugin)"
                   @stop="handleStopPlugin(plugin)"
                   @uninstall="handleUninstall(plugin)"
                 />
@@ -1202,13 +1258,11 @@ onUnmounted(() => {
               :layout="getCategoryLayout(selectedCategory.key)"
               :installing-plugin-name="marketBusyPluginName"
               :plugin-map="pluginMap"
-              :can-upgrade="canUpgrade"
               :can-install-from-market="canInstallFromMarket"
               @back="closeCategory"
               @click-plugin="openPlugin"
               @open-plugin="handleOpenPlugin"
               @download-plugin="handleInstall"
-              @upgrade-plugin="handleUpgrade"
             />
           </div>
         </Transition>

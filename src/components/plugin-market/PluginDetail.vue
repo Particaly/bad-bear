@@ -127,6 +127,21 @@ watch(
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
             </svg>
           </button>
+          <button
+            v-if="plugin.hasUpdate"
+            class="icon-btn topbar-action-btn upgrade-btn"
+            :title="isInternal ? '内置插件，不可更新' : '更新'"
+            :disabled="!!busyAction || isInternal"
+            @click="emit('upgrade')"
+          >
+            <div v-if="isBusyAction('upgrade')" class="spinner"></div>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+              <path d="M3 21v-5h5"></path>
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+              <path d="M16 8h5V3"></path>
+            </svg>
+          </button>
           <button class="icon-btn topbar-action-btn delete-btn" :title="isInternal ? '内置插件，不可卸载' : '卸载'" :disabled="!!busyAction || isInternal" @click="emit('uninstall')">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
@@ -166,6 +181,7 @@ watch(
                   <span v-if="plugin.installed" class="detail-badge">已安装</span>
                   <span v-if="plugin.isDevelopment" class="detail-badge detail-badge-dev">开发中</span>
                   <span v-if="isRunning" class="detail-badge detail-badge-running">运行中</span>
+                  <span v-if="plugin.hasUpdate" class="detail-badge detail-badge-update">可更新</span>
                 </div>
               </div>
               <div class="detail-summary">
@@ -273,6 +289,7 @@ watch(
               :selected-hash="selectedHash"
               :installed="isInstalledPlugin"
               :local-version="plugin.localVersion"
+              :local-hash="plugin.localHash"
               :busy-action="busyAction"
               :can-install-from-market="canInstallFromMarket"
               @select-version="emit('select-version', $event)"
@@ -351,11 +368,13 @@ watch(
   background: var(--primary-light-bg);
 }
 
-.topbar-action-btn.stop-btn {
+.topbar-action-btn.stop-btn,
+.topbar-action-btn.upgrade-btn {
   color: var(--warning-color);
 }
 
-.topbar-action-btn.stop-btn:hover:not(:disabled) {
+.topbar-action-btn.stop-btn:hover:not(:disabled),
+.topbar-action-btn.upgrade-btn:hover:not(:disabled) {
   background: var(--warning-light-bg);
 }
 
@@ -481,6 +500,11 @@ watch(
 .detail-badge-running {
   color: #16a34a;
   background: rgba(22, 163, 74, 0.12);
+}
+
+.detail-badge-update {
+  color: var(--warning-color);
+  background: var(--warning-light-bg);
 }
 
 .detail-desc {

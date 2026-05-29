@@ -17,7 +17,8 @@ import {
 } from './shared'
 import { buildMarketViewState, mergeMarketSnapshots } from './storefront'
 import { resolvePluginInstallPayload } from '../../../api/pluginMarket'
-import type { PluginDetailResponse, PluginMarketFetchResponse, PluginMarketUiPlugin } from '../../../types/pluginMarket'
+import { buildLatestPluginDownloadTarget, canUpgrade } from './actions/install-target'
+import type { InstalledPlugin, PluginDetailResponse, PluginMarketFetchResponse, PluginMarketUiPlugin } from '../../../types/pluginMarket'
 import type { LoginRequest, RegisterRequest } from '../../../types/auth'
 
 describe('plugin market page helpers', () => {
@@ -210,6 +211,73 @@ describe('plugin market page helpers', () => {
         ],
       },
     ])
+  })
+
+  it('marks only installed plugins returned by check-updates as updatable', () => {
+    const installed: InstalledPlugin[] = [
+      {
+        name: 'demo-plugin',
+        path: '/plugins/demo',
+        version: '1.0.0',
+        hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+      {
+        name: 'local-only',
+        path: '/plugins/local-only',
+        version: '1.0.0',
+      },
+    ]
+    const viewState = buildMarketViewState(
+      {
+        success: true,
+        data: [{ name: 'demo-plugin', version: '1.0.0', title: 'Demo Plugin' }],
+        storefront: {
+          sections: [],
+          categories: {},
+          categoryLayouts: {},
+        },
+      },
+      installed,
+      [],
+      'win32',
+      new Map([['demo-plugin', 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']]),
+    )
+
+    expect(viewState.uiPlugins.find((plugin) => plugin.name === 'demo-plugin')).toEqual(
+      expect.objectContaining({ hasUpdate: false, latestHash: undefined }),
+    )
+    expect(viewState.installedViewPlugins.find((plugin) => plugin.name === 'demo-plugin')).toEqual(
+      expect.objectContaining({
+        hasUpdate: true,
+        localHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        latestHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      }),
+    )
+    expect(viewState.installedViewPlugins.find((plugin) => plugin.name === 'local-only')).toEqual(
+      expect.objectContaining({ hasUpdate: false, latestHash: undefined }),
+    )
+  })
+
+  it('uses latestHash when building an installed plugin update target', () => {
+    const plugin: PluginMarketUiPlugin = {
+      name: 'demo-plugin',
+      version: '1.0.0',
+      title: 'Demo Plugin',
+      description: 'Demo',
+      installed: true,
+      path: '/plugins/demo',
+      localVersion: '1.0.0',
+      latestVersion: '1.0.0',
+      latestHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      hasUpdate: true,
+      marketPlugin: { name: 'demo-plugin', version: '1.0.0', title: 'Demo Plugin' },
+    }
+    const target = buildLatestPluginDownloadTarget(plugin, null)
+
+    expect(canUpgrade(plugin)).toBe(true)
+    expect(target.hash).toBe('sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+    expect(target.version).toBe('最新版本')
+    expect(target.downloadUrl).toContain('/demo-plugin/download?hash=sha256%3Abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
   })
 
   describe('validation', () => {

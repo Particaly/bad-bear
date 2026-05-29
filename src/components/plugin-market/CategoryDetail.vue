@@ -16,7 +16,6 @@ const props = defineProps<{
   layout: CategoryLayoutSection[]
   installingPluginName: string | null
   pluginMap: Map<string, PluginMarketUiPlugin>
-  canUpgrade: (plugin: PluginMarketUiPlugin) => boolean
   canInstallFromMarket?: boolean
 }>()
 
@@ -25,7 +24,6 @@ defineEmits<{
   (e: 'click-plugin', plugin: PluginMarketUiPlugin): void
   (e: 'open-plugin', plugin: PluginMarketUiPlugin): void
   (e: 'download-plugin', plugin: PluginMarketUiPlugin): void
-  (e: 'upgrade-plugin', plugin: PluginMarketUiPlugin): void
 }>()
 
 function interpolateTemplate(template: string): string {
@@ -113,12 +111,10 @@ function shuffleSection(): void {
             :key="plugin.name"
             :plugin="plugin"
             :installing-plugin="installingPluginName"
-            :can-upgrade="canUpgrade(plugin)"
             :can-install-from-market="canInstallFromMarket"
             @click="$emit('click-plugin', plugin)"
             @open="$emit('open-plugin', plugin)"
             @download="$emit('download-plugin', plugin)"
-            @upgrade="$emit('upgrade-plugin', plugin)"
           />
         </div>
       </div>

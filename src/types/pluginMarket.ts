@@ -111,6 +111,7 @@ export interface InstalledPlugin {
   name: string
   path: string
   version: string
+  hash?: string
   title?: string
   description?: string
   logo?: string
@@ -167,6 +168,16 @@ export interface PluginHashCheckResponse {
   status: PluginHashCheckStatus
   pluginName?: string
   version?: string
+}
+
+export interface PluginUpdateCheckRequestItem {
+  name: string
+  hash: string
+}
+
+export interface PluginUpdateCheckResponseItem {
+  name: string
+  latestHash: string
 }
 
 export type MyPluginUploadStatus =
@@ -281,6 +292,8 @@ export interface PluginMarketUiPlugin extends PluginMarketPlugin {
   path?: string
   localVersion?: string
   latestVersion?: string
+  localHash?: string
+  latestHash?: string
   marketPlugin?: PluginMarketPlugin
   hasUpdate?: boolean
   isRunning?: boolean
@@ -293,6 +306,8 @@ export interface InstalledViewPlugin extends PluginMarketUiPlugin {
   path: string
   localVersion: string
   latestVersion: string
+  localHash?: string
+  latestHash?: string
   installedAt?: string
 }
 

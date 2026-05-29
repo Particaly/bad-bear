@@ -5,7 +5,7 @@ export type ActiveNav = 'store' | 'installed' | 'notifications' | 'upload' | 'ac
 // 市场插件正在执行的操作类型
 export type MarketBusyAction = 'download' | 'upgrade' | null
 // 已安装插件正在执行的操作类型
-export type InstalledBusyAction = 'stop' | 'uninstall' | null
+export type InstalledBusyAction = 'upgrade' | 'stop' | 'uninstall' | null
 
 import type {
   PluginCommentRecord,

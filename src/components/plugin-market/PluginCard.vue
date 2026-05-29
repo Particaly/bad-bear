@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ZButton } from 'ztools-ui'
 import type { PluginMarketUiPlugin } from '../../types/pluginMarket'
 
 defineProps<{
   plugin: PluginMarketUiPlugin
   installingPlugin: string | null
-  canUpgrade: boolean
   canInstallFromMarket?: boolean
 }>()
 
@@ -13,7 +11,6 @@ defineEmits<{
   (e: 'click'): void
   (e: 'open'): void
   (e: 'download'): void
-  (e: 'upgrade'): void
 }>()
 </script>
 <template>
@@ -32,16 +29,7 @@ defineEmits<{
     </div>
     <div class="plugin-action">
       <template v-if="plugin.installed">
-        <ZButton
-          v-if="canUpgrade"
-          type="warning"
-          :disabled="installingPlugin === plugin.name"
-          :loading="installingPlugin === plugin.name"
-          @click.stop="$emit('upgrade')"
-        >
-          升级
-        </ZButton>
-        <button v-else class="icon-btn open-btn" title="打开" @click.stop="$emit('open')">
+        <button class="icon-btn open-btn" title="打开" @click.stop="$emit('open')">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"

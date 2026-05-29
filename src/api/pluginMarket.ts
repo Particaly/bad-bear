@@ -10,6 +10,7 @@ export {
   fetchPluginMarket,
   streamPluginMarket,
   checkPluginUploadHash,
+  checkPluginUpdates,
   getMyPluginUploads,
   deleteMyPluginUpload,
   uploadPluginPackage,

@@ -29,17 +29,22 @@ export function buildEncodedPluginDownloadPath(
 ): string {
   const encodedName = encodeURIComponent(name)
 
+  if (hash) {
+    const encodedHash = encodeURIComponent(hash)
+    if (!version) {
+      return `/api/v1/plugins/${encodedName}/download?hash=${encodedHash}`
+    }
+
+    const encodedVersion = encodeURIComponent(version)
+    return `/api/v1/plugins/${encodedName}/${encodedVersion}/${encodedHash}/download`
+  }
+
   if (!version) {
     return `/api/v1/plugins/${encodedName}/download`
   }
 
   const encodedVersion = encodeURIComponent(version)
-  if (!hash) {
-    return `/api/v1/plugins/${encodedName}/${encodedVersion}/download`
-  }
-
-  const encodedHash = encodeURIComponent(hash)
-  return `/api/v1/plugins/${encodedName}/${encodedVersion}/${encodedHash}/download`
+  return `/api/v1/plugins/${encodedName}/${encodedVersion}/download`
 }
 
 export function buildPluginDownloadUrl(
@@ -59,7 +64,7 @@ export function resolvePluginInstallPayload(
 ): PluginMarketPlugin {
   const resolvedVersion = options.version || plugin.version
   const downloadUrl = options.hash
-    ? buildPluginDownloadUrl(plugin.name, resolvedVersion, options.hash)
+    ? buildPluginDownloadUrl(plugin.name, options.version || null, options.hash)
     : options.version
       ? buildPluginDownloadUrl(plugin.name, resolvedVersion)
       : buildPluginDownloadUrl(plugin.name)

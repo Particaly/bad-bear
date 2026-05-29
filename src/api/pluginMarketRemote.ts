@@ -26,6 +26,8 @@ import type {
   PluginRatingsPage,
   PluginRiskInfo,
   PluginStatsResponse,
+  PluginUpdateCheckRequestItem,
+  PluginUpdateCheckResponseItem,
   PluginUploadAcceptedResponse,
   PluginUploadPayload,
   PluginUploadResponse,
@@ -558,6 +560,19 @@ export function checkPluginUploadHash(hash: string): Promise<PluginHashCheckResp
     path: '/api/v1/plugins/check-hash',
     method: 'POST',
     body: { hash },
+  })
+}
+
+/**
+ * 按宿主返回的本地插件 hash 批量查询同一上传者范围内是否存在新版本。
+ */
+export function checkPluginUpdates(
+  plugins: PluginUpdateCheckRequestItem[],
+): Promise<PluginUpdateCheckResponseItem[]> {
+  return requestJson<PluginUpdateCheckResponseItem[], { plugins: PluginUpdateCheckRequestItem[] }>({
+    path: '/api/v1/plugins/check-updates',
+    method: 'POST',
+    body: { plugins },
   })
 }
 

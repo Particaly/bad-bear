@@ -10,6 +10,7 @@ const props = defineProps<{
   selectedHash?: string | null
   installed?: boolean
   localVersion?: string | null
+  localHash?: string | null
   busyAction?: 'download' | 'upgrade' | 'reload' | 'stop' | 'uninstall' | null
   canInstallFromMarket?: boolean
 }>()
@@ -74,9 +75,16 @@ function isSelected(version: PluginDetailVersion): boolean {
   return props.selectedVersion === version.version && props.selectedHash === version.hash
 }
 
+/**
+ * 只有本地安装 hash 命中当前构建时才隐藏安装按钮，同版本不同构建仍允许重装或切换。
+ */
 function canInstallVersion(version: PluginDetailVersion): boolean {
   if (!props.installed) {
     return true
+  }
+
+  if (props.localHash) {
+    return props.localHash !== version.hash
   }
 
   if (!props.localVersion) {
@@ -86,9 +94,16 @@ function canInstallVersion(version: PluginDetailVersion): boolean {
   return compareVersions(props.localVersion, version.version) !== 0
 }
 
+/**
+ * 根据本地安装版本和 hash 给每个构建生成动作文案，同版本不同 hash 视为可重装构建。
+ */
 function getActionLabel(version: PluginDetailVersion): string {
   if (!props.installed) {
     return props.canInstallFromMarket === false ? '下载此版本' : '安装此版本'
+  }
+
+  if (props.localHash && props.localHash === version.hash) {
+    return '当前已安装'
   }
 
   if (!props.localVersion) {
@@ -103,22 +118,19 @@ function getActionLabel(version: PluginDetailVersion): string {
     return '安装历史版本'
   }
 
-  return '已安装同版本'
+  return '重装此版本'
 }
 
+/**
+ * 通过显式按钮切换当前查看的版本，避免整张版本卡片抢占安装点击。
+ */
 function handleSelect(version: PluginDetailVersion): void {
   emit('select-version', version)
 }
 
-function handleSelectByKeyboard(event: KeyboardEvent, version: PluginDetailVersion): void {
-  if (event.key !== 'Enter' && event.key !== ' ') {
-    return
-  }
-
-  event.preventDefault()
-  handleSelect(version)
-}
-
+/**
+ * 触发指定版本的安装动作，实际安装或升级由父组件根据当前插件状态处理。
+ */
 function handleInstall(version: PluginDetailVersion): void {
   emit('install-version', version)
 }
@@ -134,10 +146,6 @@ function handleInstall(version: PluginDetailVersion): void {
         :key="version.id || `${version.version}-${version.hash}`"
         class="version-card card"
         :class="{ selected: isSelected(version) }"
-        role="button"
-        tabindex="0"
-        @click="handleSelect(version)"
-        @keydown="handleSelectByKeyboard($event, version)"
       >
         <div class="version-card-header">
           <div class="version-title">
@@ -169,11 +177,20 @@ function handleInstall(version: PluginDetailVersion): void {
         <div class="version-card-footer">
           <span v-if="isSelected(version)" class="version-selected-badge">当前查看</span>
           <button
+            type="button"
+            class="version-view-btn"
+            :class="{ visible: isSelected(version) }"
+            :disabled="!!busyAction"
+            @click="handleSelect(version)"
+          >
+            查看
+          </button>
+          <button
             v-if="canInstallVersion(version)"
             type="button"
             class="version-install-btn"
             :disabled="!!busyAction"
-            @click.stop="handleInstall(version)"
+            @click="handleInstall(version)"
           >
             {{ getActionLabel(version) }}
           </button>
@@ -203,7 +220,7 @@ function handleInstall(version: PluginDetailVersion): void {
   border: 1px solid var(--divider-color);
   background: var(--bg-color);
   text-align: left;
-  cursor: pointer;
+  cursor: default;
   transition: border-color 0.2s, background 0.2s, transform 0.2s;
 }
 
@@ -298,8 +315,38 @@ function handleInstall(version: PluginDetailVersion): void {
   font-weight: 600;
 }
 
+.version-view-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.version-card:hover .version-view-btn,
+.version-view-btn.visible,
+.version-view-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.version-view-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.version-view-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .version-install-btn {
-  margin-left: auto;
   padding: 6px 12px;
   border: 1px solid var(--primary-color);
   border-radius: 8px;

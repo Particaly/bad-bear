@@ -5,7 +5,7 @@ import {
   deleteInstalledPlugin,
   installMarketPlugin,
 } from '../../../../api/pluginMarket'
-import type { PluginDetailState, MarketBusyAction } from '../shared'
+import type { PluginDetailState, MarketBusyAction, InstalledBusyAction } from '../shared'
 import type {
   PluginDetailResponse,
   PluginMarketUiPlugin,
@@ -154,6 +154,7 @@ export async function handleUpgrade(
     marketBusyPluginName: Ref<string | null>
     marketBusyAction: Ref<MarketBusyAction>
     installedBusyPluginName: Ref<string | null>
+    installedBusyAction: Ref<InstalledBusyAction>
     notifyError: (message: string) => void
     notifySuccess: (message: string) => void
     reloadMarket: () => Promise<void>
@@ -201,8 +202,13 @@ export async function handleUpgrade(
     }
   }
 
-  params.marketBusyPluginName.value = plugin.name
-  params.marketBusyAction.value = 'upgrade'
+  const isInstalledListUpgrade = plugin.hasUpdate && !!plugin.latestHash
+  params.installedBusyPluginName.value = plugin.name
+  params.installedBusyAction.value = 'upgrade'
+  if (!isInstalledListUpgrade) {
+    params.marketBusyPluginName.value = plugin.name
+    params.marketBusyAction.value = 'upgrade'
+  }
 
   try {
     // 先删除旧版本
@@ -236,6 +242,8 @@ export async function handleUpgrade(
     )
     await params.reloadMarket()
   } finally {
+    params.installedBusyPluginName.value = null
+    params.installedBusyAction.value = null
     params.marketBusyPluginName.value = null
     params.marketBusyAction.value = null
   }

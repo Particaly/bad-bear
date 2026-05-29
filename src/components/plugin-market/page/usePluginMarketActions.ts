@@ -53,6 +53,9 @@ export function usePluginMarketActions(options: {
     return checkCanUpgrade(plugin)
   }
 
+  /**
+   * 将安装动作包装到页面状态中，统一传入当前详情选择、忙碌状态和安装后刷新逻辑。
+   */
   async function handleInstallWrapper(
     plugin: PluginMarketUiPlugin,
     installParams: { preferLatest?: boolean } = {},
@@ -73,6 +76,9 @@ export function usePluginMarketActions(options: {
     })
   }
 
+  /**
+   * 从详情页触发安装最新版时强制忽略历史版本选择，始终解析最新可安装目标。
+   */
   async function handleInstallLatestWrapper(plugin: PluginMarketUiPlugin): Promise<void> {
     await handleInstallLatest(plugin, {
       canInstallFromMarket: canInstallFromMarket.value,
@@ -89,6 +95,9 @@ export function usePluginMarketActions(options: {
     })
   }
 
+  /**
+   * 包装更新动作所需的确认弹窗、忙碌状态和刷新回调，供已安装列表与详情页复用。
+   */
   async function handleUpgradeWrapper(plugin: PluginMarketUiPlugin): Promise<void> {
     await handleUpgrade(plugin, {
       selectedPluginName: options.selectedPluginName.value,
@@ -97,6 +106,7 @@ export function usePluginMarketActions(options: {
       marketBusyPluginName,
       marketBusyAction,
       installedBusyPluginName,
+      installedBusyAction,
       notifyError: options.notifyError,
       notifySuccess: options.notifySuccess,
       reloadMarket: options.reloadMarket,
@@ -115,6 +125,9 @@ export function usePluginMarketActions(options: {
     })
   }
 
+  /**
+   * 卸载插件时串联确认、宿主删除和列表刷新，避免多个入口重复维护状态细节。
+   */
   async function handleUninstallWrapper(plugin: PluginMarketUiPlugin): Promise<void> {
     await handleUninstall(plugin, {
       marketBusyPluginName,
@@ -128,6 +141,9 @@ export function usePluginMarketActions(options: {
     })
   }
 
+  /**
+   * 停止运行中的插件并刷新运行状态，供列表卡片和详情页共享同一忙碌态。
+   */
   async function handleStopPluginWrapper(plugin: PluginMarketUiPlugin): Promise<void> {
     await handleStopPlugin(plugin, {
       marketBusyPluginName,
@@ -139,6 +155,9 @@ export function usePluginMarketActions(options: {
     })
   }
 
+  /**
+   * 打开插件安装目录，并把宿主能力缺失等错误统一转换为页面提示。
+   */
   async function handleOpenFolderWrapper(plugin: PluginMarketUiPlugin): Promise<void> {
     await handleOpenFolder(plugin, {
       notifyError: options.notifyError,

@@ -1,7 +1,6 @@
 // 插件列表和已安装插件状态映射辅助函数
 
 import type { InstalledPlugin, InstalledViewPlugin, Platform, PluginMarketPlugin, PluginMarketUiPlugin } from '../../../types/pluginMarket'
-import { compareVersions } from '../utils'
 
 /**
  * 检查插件在当前平台是否可见
@@ -27,8 +26,8 @@ export function toInstalledMap(installedPlugins: InstalledPlugin[]): Map<string,
 }
 
 /**
- * 合并市场插件数据和已安装插件数据，创建统一的 UI 插件模型
- * 市场数据优先用于大多数字段，已安装数据提供后备值
+ * 合并市场插件数据和已安装插件数据，创建统一的商店卡片模型。
+ * 商店页只展示安装与运行状态，不根据版本或服务端更新检查结果暴露升级入口。
  */
 export function toUiPlugin(
   plugin: PluginMarketPlugin,
@@ -51,31 +50,30 @@ export function toUiPlugin(
     path: installedPlugin?.path,
     localVersion,
     latestVersion: plugin.version || localVersion || '',
+    localHash: installedPlugin?.hash,
+    latestHash: undefined,
     marketPlugin: plugin,
-    // 比较本地版本和市场版本，判断是否有更新
-    hasUpdate:
-      !!installedPlugin &&
-      !!localVersion &&
-      !!plugin.version &&
-      compareVersions(localVersion, plugin.version) < 0,
+    hasUpdate: false,
     isRunning: !!installedPlugin?.path && runningPluginSet.has(installedPlugin.path),
     isDevelopment: installedPlugin?.isDevelopment ?? false,
   }
 }
 
 /**
- * 构建已安装插件列表，并用市场数据进行增强
- * 按安装时间降序排序（最新的在前）
+ * 构建已安装插件列表，并用市场数据和服务端更新检查结果进行增强。
+ * 更新状态只信任 check-updates 返回的 latestHash，按安装时间降序排序。
  */
 export function buildInstalledViewPlugins(
   installedPlugins: InstalledPlugin[],
   marketPluginMap: Map<string, PluginMarketPlugin>,
   runningPluginSet: Set<string>,
+  updateHashMap: Map<string, string> = new Map(),
 ): InstalledViewPlugin[] {
   return installedPlugins
     .map((plugin): InstalledViewPlugin => {
       const marketPlugin = marketPluginMap.get(plugin.name)
       const latestVersion = marketPlugin?.version || plugin.version || ''
+      const latestHash = updateHashMap.get(plugin.name)
 
       return {
         ...marketPlugin,
@@ -92,10 +90,10 @@ export function buildInstalledViewPlugins(
         path: plugin.path,
         localVersion: plugin.version,
         latestVersion,
+        localHash: plugin.hash,
+        latestHash,
         marketPlugin,
-        // 比较版本判断是否有更新
-        hasUpdate:
-          !!marketPlugin?.version && compareVersions(plugin.version, marketPlugin.version) < 0,
+        hasUpdate: !!latestHash,
         isRunning: runningPluginSet.has(plugin.path),
         isDevelopment: !!plugin.isDevelopment,
       }

@@ -24,6 +24,7 @@ export function buildMarketViewState(
   nextInstalledPlugins: InstalledPlugin[],
   nextRunningPluginPaths: string[],
   currentPlatform: Platform,
+  updateHashMap: Map<string, string> = new Map(),
 ): {
   uiPlugins: PluginMarketUiPlugin[]
   marketPlugins: PluginMarketPlugin[]
@@ -111,6 +112,7 @@ export function buildMarketViewState(
       nextInstalledPlugins,
       nextMarketPluginMap,
       runningSet,
+      updateHashMap,
     ),
   }
 }

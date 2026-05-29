@@ -13,10 +13,14 @@ const emit = defineEmits<{
   (e: 'click'): void
   (e: 'open'): void
   (e: 'open-folder'): void
+  (e: 'upgrade'): void
   (e: 'stop'): void
   (e: 'uninstall'): void
 }>()
 
+/**
+ * 判断当前卡片是否正在执行指定已安装插件动作，用于同步按钮禁用和加载态。
+ */
 function isBusyAction(action: Exclude<InstalledBusyAction, null>): boolean {
   return props.busyAction === action
 }
@@ -78,6 +82,32 @@ function isBusyAction(action: Exclude<InstalledBusyAction, null>): boolean {
           stroke-linejoin="round"
         >
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </button>
+      <button
+        v-if="plugin.hasUpdate"
+        class="icon-btn upgrade-btn"
+        :disabled="!!busyAction || isInternal"
+        :title="isInternal ? '内置插件，不可更新' : '更新插件'"
+        @click.stop="emit('upgrade')"
+      >
+        <div v-if="isBusyAction('upgrade')" class="spinner"></div>
+        <svg
+          v-else
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+          <path d="M3 21v-5h5"></path>
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+          <path d="M16 8h5V3"></path>
         </svg>
       </button>
       <button v-if="plugin.isRunning && canStop" class="icon-btn stop-btn" :disabled="!!busyAction" title="停止运行" @click.stop="emit('stop')">
@@ -250,10 +280,12 @@ function isBusyAction(action: Exclude<InstalledBusyAction, null>): boolean {
   background: var(--primary-light-bg);
 }
 
+.upgrade-btn,
 .stop-btn {
   color: var(--warning-color);
 }
 
+.upgrade-btn:hover:not(:disabled),
 .stop-btn:hover:not(:disabled) {
   background: var(--warning-light-bg);
 }

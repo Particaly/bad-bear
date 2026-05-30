@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SHOP_API_BASE_URL, saveShopApiRuntimeConfig } from '../config/runtimeConfig'
-import { fetchPluginMarket, getPluginRisk, streamPluginMarket } from './pluginMarketRemote'
+import { fetchPluginMarket, getPluginRisk, streamPluginMarket, checkPluginUpdates } from './pluginMarketRemote'
 
 const originalFetch = globalThis.fetch
 
@@ -363,6 +363,47 @@ describe('plugin market stream', () => {
     expect(navigationSection?.categories).toEqual([
       expect.objectContaining({ key: 'tools', title: '工具', pluginCount: 1 }),
       expect.objectContaining({ key: 'empty', title: '空分类', pluginCount: 0 }),
+    ])
+  })
+
+  it('posts installed plugin hashes to check updates', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/plugins/check-updates')) {
+        expect(init?.method).toBe('POST')
+        expect(JSON.parse(String(init?.body))).toEqual({
+          plugins: [
+            {
+              name: 'demo-plugin',
+              hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            },
+          ],
+        })
+        return jsonResponse([
+          {
+            name: 'demo-plugin',
+            latestHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          },
+        ])
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    globalThis.fetch = fetchMock as typeof fetch
+
+    const updates = await checkPluginUpdates([
+      {
+        name: 'demo-plugin',
+        hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    ])
+
+    expect(updates).toEqual([
+      {
+        name: 'demo-plugin',
+        latestHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      },
     ])
   })
 

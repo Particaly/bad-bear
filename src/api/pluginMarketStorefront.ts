@@ -72,6 +72,7 @@ export function resolvePluginInstallPayload(
   return {
     ...plugin,
     version: resolvedVersion,
+    hash: options.hash || plugin.hash,
     downloadUrl,
   }
 }
@@ -116,6 +117,7 @@ export function adaptPlugin(dto: PluginMarketPluginDto): PluginMarketPlugin {
     categories,
     categoryFallback: !!dto.categoryFallback,
     downloadUrl: normalizeMarketAssetUrl(dto.downloadUrl),
+    hash: dto.hash ?? undefined,
     source: dto.source,
     uploaderUserId: dto.uploaderUserId ?? null,
     uploaderAccount: dto.uploaderAccount ?? null,

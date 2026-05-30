@@ -72,17 +72,20 @@ export function buildLatestPluginDownloadTarget(
   }
 
   const latestBuild = detail?.versions?.[0] || null
+  const fallbackHash = latestBuild?.hash || plugin.hash || null
   const payload = latestBuild
     ? resolvePluginInstallPayload(plugin.marketPlugin || plugin, {
         version: latestBuild.version,
         hash: latestBuild.hash,
       })
-    : resolvePluginInstallPayload(plugin.marketPlugin || plugin)
+    : resolvePluginInstallPayload(plugin.marketPlugin || plugin, {
+        hash: fallbackHash,
+      })
 
   return {
     version: latestBuild?.version || payload.version,
-    hash: latestBuild?.hash || null,
-    downloadMode: latestBuild ? 'hash' : 'latest',
+    hash: fallbackHash,
+    downloadMode: fallbackHash ? 'hash' : 'latest',
     downloadUrl: payload.downloadUrl || '',
     build: latestBuild,
     plugin: payload,

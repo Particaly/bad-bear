@@ -4,6 +4,7 @@ import type { Ref } from 'vue'
 import {
   deleteInstalledPlugin,
   openInstalledPlugin,
+  removeMarketInstalledPluginHash,
   revealPluginInFinder,
   stopInstalledPlugin,
 } from '../../../../api/pluginMarket'
@@ -92,6 +93,7 @@ export async function handleUninstall(
     }
 
     params.notifySuccess(`已卸载 ${plugin.title}`)
+    removeMarketInstalledPluginHash(plugin.name)
     params.closePlugin()
     await params.reloadMarket()
   } catch (error) {

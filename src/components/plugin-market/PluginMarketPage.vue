@@ -2,10 +2,14 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ZButton, ZCheckbox, ZModal } from 'ztools-ui'
 import {
+  applyMarketInstalledPluginHashes,
+  buildMarketPluginUpdateCheckItems,
   checkPluginUpdates,
   getCurrentPlatform,
   getInstalledPlugins,
   getRunningPlugins,
+  normalizeSha256Hash,
+  readMarketInstalledPluginHashes,
   streamPluginMarket,
 } from '../../api/pluginMarket'
 import { useToast } from '../common/Toast'
@@ -20,7 +24,6 @@ import type {
   PluginMarketSectionModel,
   PluginMarketStreamSnapshot,
   PluginMarketUiPlugin,
-  PluginUpdateCheckRequestItem,
   StorefrontCategorySummary,
 } from '../../types/pluginMarket'
 import AccountPanel from './AccountPanel.vue'
@@ -127,29 +130,13 @@ function openPluginByName(name: string) {
 }
 
 /**
- * 校验宿主返回的 hash 是否符合更新检查接口要求的 sha256 格式。
- */
-function isSha256Hash(hash: unknown): hash is string {
-  return typeof hash === 'string' && /^sha256:[0-9a-f]{64}$/.test(hash)
-}
-
-/**
- * 只使用宿主注入的合法本地包 hash 构造更新检查请求，缺失 hash 的插件由服务端查询流程跳过。
- */
-function buildPluginUpdateCheckItems(pluginsToCheck: InstalledPlugin[]): PluginUpdateCheckRequestItem[] {
-  return pluginsToCheck
-    .filter((plugin) => isSha256Hash(plugin.hash))
-    .map((plugin) => ({
-      name: plugin.name,
-      hash: plugin.hash,
-    }))
-}
-
-/**
  * 查询可更新插件并转换为按插件名索引的 latestHash 表，失败时不影响已安装列表加载。
  */
-async function loadInstalledUpdateHashes(pluginsToCheck: InstalledPlugin[]): Promise<Record<string, string>> {
-  const items = buildPluginUpdateCheckItems(pluginsToCheck)
+async function loadInstalledUpdateHashes(
+  pluginsToCheck: InstalledPlugin[],
+  hashRecords = readMarketInstalledPluginHashes(),
+): Promise<Record<string, string>> {
+  const items = buildMarketPluginUpdateCheckItems(pluginsToCheck, hashRecords)
   if (items.length === 0) {
     return {}
   }
@@ -158,7 +145,8 @@ async function loadInstalledUpdateHashes(pluginsToCheck: InstalledPlugin[]): Pro
     const updates = await checkPluginUpdates(items)
     return Object.fromEntries(
       updates
-        .filter((item) => item.name && isSha256Hash(item.latestHash))
+        .map((item) => ({ name: item.name, latestHash: normalizeSha256Hash(item.latestHash) }))
+        .filter((item): item is { name: string; latestHash: string } => !!item.name && !!item.latestHash)
         .map((item) => [item.name, item.latestHash]),
     )
   } catch (error) {
@@ -291,13 +279,15 @@ async function reloadMarket() {
 
   const installedTask = getInstalledPlugins()
     .then(async (items) => {
-      const nextUpdateHashes = await loadInstalledUpdateHashes(items)
+      const hashRecords = readMarketInstalledPluginHashes()
+      const registryItems = applyMarketInstalledPluginHashes(items, hashRecords)
+      const nextUpdateHashes = await loadInstalledUpdateHashes(registryItems, hashRecords)
       if (sessionId !== marketReloadSessionId || controller.signal.aborted) {
-        return { items, updateHashes: nextUpdateHashes }
+        return { items: registryItems, updateHashes: nextUpdateHashes }
       }
 
       canUseInternalPluginApis.value = true
-      resolvedInstalledPlugins = items
+      resolvedInstalledPlugins = registryItems
       resolvedUpdateHashes = nextUpdateHashes
       if (latestStreamMarketResponse) {
         renderMarketSnapshot(
@@ -308,7 +298,7 @@ async function reloadMarket() {
           resolvedUpdateHashes,
         )
       }
-      return { items, updateHashes: nextUpdateHashes }
+      return { items: registryItems, updateHashes: nextUpdateHashes }
     })
     .catch((error) => {
       if (isPluginHostPermissionDeniedError(error)) {

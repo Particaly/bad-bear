@@ -16,7 +16,7 @@ import {
   validateAvatarFile,
 } from './shared'
 import { buildMarketViewState, mergeMarketSnapshots } from './storefront'
-import { resolvePluginInstallPayload } from '../../../api/pluginMarket'
+import { adaptPlugin, resolvePluginInstallPayload } from '../../../api/pluginMarket'
 import { buildLatestPluginDownloadTarget, canUpgrade } from './actions/install-target'
 import type { InstalledPlugin, PluginDetailResponse, PluginMarketFetchResponse, PluginMarketUiPlugin } from '../../../types/pluginMarket'
 import type { LoginRequest, RegisterRequest } from '../../../types/auth'
@@ -88,6 +88,17 @@ describe('plugin market page helpers', () => {
     expect(isPluginHostPermissionDeniedError(new Error('普通错误'))).toBe(false)
   })
 
+  it('preserves storefront hashes when adapting plugins', () => {
+    const plugin = adaptPlugin({
+      name: 'demo-plugin',
+      version: '1.0.0',
+      title: 'Demo',
+      hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })
+
+    expect(plugin.hash).toBe('sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  })
+
   it('resolves plugin install payload for selected version and build', () => {
     const payload = resolvePluginInstallPayload(
       {
@@ -99,6 +110,7 @@ describe('plugin market page helpers', () => {
     )
 
     expect(payload.version).toBe('2.0.0')
+    expect(payload.hash).toBe('abc123')
     expect(payload.downloadUrl).toContain('/demo-plugin/2.0.0/abc123/download')
   })
 
@@ -213,7 +225,7 @@ describe('plugin market page helpers', () => {
     ])
   })
 
-  it('marks only installed plugins returned by check-updates as updatable', () => {
+  it('uses enriched installed hashes when marking installed plugins returned by check-updates as updatable', () => {
     const installed: InstalledPlugin[] = [
       {
         name: 'demo-plugin',
@@ -256,6 +268,29 @@ describe('plugin market page helpers', () => {
     expect(viewState.installedViewPlugins.find((plugin) => plugin.name === 'local-only')).toEqual(
       expect.objectContaining({ hasUpdate: false, latestHash: undefined }),
     )
+  })
+
+  it('uses the storefront hash when building a latest install target without detail versions', () => {
+    const plugin: PluginMarketUiPlugin = {
+      name: 'demo-plugin',
+      version: '1.0.0',
+      title: 'Demo Plugin',
+      description: 'Demo',
+      installed: false,
+      hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      marketPlugin: {
+        name: 'demo-plugin',
+        version: '1.0.0',
+        title: 'Demo Plugin',
+        hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    }
+    const target = buildLatestPluginDownloadTarget(plugin, null)
+
+    expect(target.hash).toBe('sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+    expect(target.downloadMode).toBe('hash')
+    expect(target.plugin.hash).toBe('sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+    expect(target.downloadUrl).toContain('/demo-plugin/download?hash=sha256%3Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
   })
 
   it('uses latestHash when building an installed plugin update target', () => {

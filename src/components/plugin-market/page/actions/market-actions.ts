@@ -4,6 +4,7 @@ import type { ComputedRef, Ref } from 'vue'
 import {
   deleteInstalledPlugin,
   installMarketPlugin,
+  upsertMarketInstalledPluginHash,
 } from '../../../../api/pluginMarket'
 import type { PluginDetailState, MarketBusyAction, InstalledBusyAction } from '../shared'
 import type {
@@ -101,6 +102,9 @@ export async function handleInstall(
     if (!result.success) {
       throw new Error(result.error || '安装失败')
     }
+
+    const target = resolvePluginTargetForAction(plugin, params)
+    upsertMarketInstalledPluginHash(plugin.name, target?.hash || installPayload.hash)
 
     params.notifySuccess(
       requirePluginInstallSuccessText(plugin, {
@@ -222,6 +226,8 @@ export async function handleUpgrade(
     if (!installResult.success) {
       throw new Error(installResult.error || '安装新版本失败')
     }
+
+    upsertMarketInstalledPluginHash(plugin.name, target?.hash || installPayload.hash)
 
     params.notifySuccess(
       requirePluginUpgradeSuccessText(plugin, {

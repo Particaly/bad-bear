@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { handleOpenPlugin, handleStopPlugin } from './installed-actions'
+import { handleOpenPlugin, handleStopPlugin, handleUninstall } from './installed-actions'
+import type { InstalledBusyAction } from '../shared'
 import type { PluginMarketUiPlugin } from '../../../../types/pluginMarket'
 import { useMarketRiskDialog } from '../../../../app/useMarketRiskDialog'
 
-const { stopInstalledPluginMock, openInstalledPluginMock } = vi.hoisted(() => ({
+const { stopInstalledPluginMock, openInstalledPluginMock, deleteInstalledPluginMock, removeMarketInstalledPluginHashMock } = vi.hoisted(() => ({
   stopInstalledPluginMock: vi.fn(),
   openInstalledPluginMock: vi.fn(),
+  deleteInstalledPluginMock: vi.fn(),
+  removeMarketInstalledPluginHashMock: vi.fn(),
 }))
+
+function createInstalledBusyActionRef() {
+  return ref<InstalledBusyAction>(null)
+}
 
 vi.mock('../../../../api/pluginMarket', () => ({
   stopInstalledPlugin: stopInstalledPluginMock,
-  deleteInstalledPlugin: vi.fn(),
+  deleteInstalledPlugin: deleteInstalledPluginMock,
   openInstalledPlugin: openInstalledPluginMock,
+  removeMarketInstalledPluginHash: removeMarketInstalledPluginHashMock,
   revealPluginInFinder: vi.fn(),
 }))
 
@@ -33,6 +41,8 @@ describe('installed plugin actions', () => {
   beforeEach(() => {
     stopInstalledPluginMock.mockReset()
     openInstalledPluginMock.mockReset()
+    deleteInstalledPluginMock.mockReset()
+    removeMarketInstalledPluginHashMock.mockReset()
     window.localStorage.clear()
   })
 
@@ -115,11 +125,84 @@ describe('installed plugin actions', () => {
     await expect(confirmOpenPluginRisk(plugin)).resolves.toBe(true)
   })
 
+  it('removes the registry record after uninstall succeeds', async () => {
+    deleteInstalledPluginMock.mockResolvedValueOnce({ success: true })
+    const marketBusyPluginName = ref<string | null>(null)
+    const installedBusyPluginName = ref<string | null>(null)
+    const installedBusyAction = createInstalledBusyActionRef()
+    const notifyError = vi.fn()
+    const notifySuccess = vi.fn()
+    const confirmAction = vi.fn(async () => true)
+    const closePlugin = vi.fn()
+    const reloadMarket = vi.fn(async () => {})
+
+    await handleUninstall(createPlugin(), {
+      marketBusyPluginName,
+      installedBusyPluginName,
+      installedBusyAction,
+      notifyError,
+      notifySuccess,
+      confirmAction,
+      closePlugin,
+      reloadMarket,
+    })
+
+    expect(deleteInstalledPluginMock).toHaveBeenCalledWith('C:/plugins/demo-plugin')
+    expect(removeMarketInstalledPluginHashMock).toHaveBeenCalledWith('demo-plugin')
+    expect(notifySuccess).toHaveBeenCalledWith('已卸载 Demo Plugin')
+    expect(closePlugin).toHaveBeenCalledTimes(1)
+    expect(reloadMarket).toHaveBeenCalledTimes(1)
+    expect(notifyError).not.toHaveBeenCalled()
+  })
+
+  it('does not remove the registry record when uninstall is cancelled', async () => {
+    const marketBusyPluginName = ref<string | null>(null)
+    const installedBusyPluginName = ref<string | null>(null)
+    const installedBusyAction = createInstalledBusyActionRef()
+    const confirmAction = vi.fn(async () => false)
+
+    await handleUninstall(createPlugin(), {
+      marketBusyPluginName,
+      installedBusyPluginName,
+      installedBusyAction,
+      notifyError: vi.fn(),
+      notifySuccess: vi.fn(),
+      confirmAction,
+      closePlugin: vi.fn(),
+      reloadMarket: vi.fn(async () => {}),
+    })
+
+    expect(deleteInstalledPluginMock).not.toHaveBeenCalled()
+    expect(removeMarketInstalledPluginHashMock).not.toHaveBeenCalled()
+  })
+
+  it('does not remove the registry record when uninstall fails', async () => {
+    deleteInstalledPluginMock.mockResolvedValueOnce({ success: false, error: 'boom' })
+    const marketBusyPluginName = ref<string | null>(null)
+    const installedBusyPluginName = ref<string | null>(null)
+    const installedBusyAction = createInstalledBusyActionRef()
+    const notifyError = vi.fn()
+
+    await handleUninstall(createPlugin(), {
+      marketBusyPluginName,
+      installedBusyPluginName,
+      installedBusyAction,
+      notifyError,
+      notifySuccess: vi.fn(),
+      confirmAction: vi.fn(async () => true),
+      closePlugin: vi.fn(),
+      reloadMarket: vi.fn(async () => {}),
+    })
+
+    expect(removeMarketInstalledPluginHashMock).not.toHaveBeenCalled()
+    expect(notifyError).toHaveBeenCalledWith('boom')
+  })
+
   it('stops a running plugin and refreshes the market', async () => {
     stopInstalledPluginMock.mockResolvedValueOnce({ success: true })
     const marketBusyPluginName = ref<string | null>(null)
     const installedBusyPluginName = ref<string | null>(null)
-    const installedBusyAction = ref<'stop' | 'uninstall' | null>(null)
+    const installedBusyAction = createInstalledBusyActionRef()
     const notifyError = vi.fn()
     const notifySuccess = vi.fn()
     const reloadMarket = vi.fn(async () => {})
@@ -145,7 +228,7 @@ describe('installed plugin actions', () => {
     stopInstalledPluginMock.mockResolvedValueOnce({ success: false, error: 'boom' })
     const marketBusyPluginName = ref<string | null>(null)
     const installedBusyPluginName = ref<string | null>(null)
-    const installedBusyAction = ref<'stop' | 'uninstall' | null>(null)
+    const installedBusyAction = createInstalledBusyActionRef()
     const notifyError = vi.fn()
     const notifySuccess = vi.fn()
     const reloadMarket = vi.fn(async () => {})

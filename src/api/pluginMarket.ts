@@ -17,6 +17,15 @@ export {
 } from './pluginMarketRemote'
 
 export {
+  applyMarketInstalledPluginHashes,
+  buildMarketPluginUpdateCheckItems,
+  normalizeSha256Hash,
+  readMarketInstalledPluginHashes,
+  removeMarketInstalledPluginHash,
+  upsertMarketInstalledPluginHash,
+} from './pluginMarketInstallRegistry'
+
+export {
   buildPluginDownloadUrl,
   resolvePluginInstallPayload,
   adaptPlugin,

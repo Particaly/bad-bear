@@ -37,6 +37,7 @@ export interface PluginMarketPluginDto {
   categories?: string[]
   categoryFallback?: boolean
   downloadUrl?: string
+  hash?: string | null
   source?: PluginReleaseSource
   uploaderUserId?: string | null
   uploaderAccount?: string | null
@@ -81,6 +82,7 @@ export interface PluginMarketPlugin {
   description?: string
   logo?: string
   downloadUrl?: string
+  hash?: string
   platform?: Platform[]
   author?: string
   homepage?: string

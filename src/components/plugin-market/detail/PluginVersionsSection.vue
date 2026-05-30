@@ -177,9 +177,9 @@ function handleInstall(version: PluginDetailVersion): void {
         <div class="version-card-footer">
           <span v-if="isSelected(version)" class="version-selected-badge">当前查看</span>
           <button
+            v-if="!isSelected(version)"
             type="button"
             class="version-view-btn"
-            :class="{ visible: isSelected(version) }"
             :disabled="!!busyAction"
             @click="handleSelect(version)"
           >

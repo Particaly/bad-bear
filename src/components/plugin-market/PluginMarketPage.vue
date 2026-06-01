@@ -605,7 +605,6 @@ const {
   uploadsError: uploadRecordsError,
   deletingIds: uploadDeletingIds,
   selectFile: uploadSelectFile,
-  computeHashAndPrecheck: uploadPrecheck,
   performUpload: uploadPerformUpload,
   loadUploads: uploadLoadRecords,
   handleDeleteUpload: uploadHandleDelete,
@@ -731,13 +730,13 @@ const sideNavItems = computed<SideNavItem[]>(() => {
       visible: canUseInternalPluginApis.value,
     },
     {
+      key: 'upload',
+      label: '上传',
+    },
+    {
       key: 'notifications',
       label: '通知',
       badge: notificationBadgeText.value,
-    },
-    {
-      key: 'upload',
-      label: '上传',
     },
     {
       key: 'account',
@@ -1196,7 +1195,6 @@ onUnmounted(() => {
             :deleting-ids="uploadDeletingIds"
             @select-file="handleUploadSelectFile"
             @clear-file="handleUploadClearFile"
-            @precheck="uploadPrecheck"
             @upload="uploadPerformUpload"
             @refresh-uploads="uploadLoadRecords"
             @delete-upload="uploadHandleDelete"

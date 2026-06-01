@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { ZButton } from 'ztools-ui'
 import type { AuthUser } from '../../types/auth'
 import type {
@@ -30,7 +30,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-file', file: File): void
   (e: 'clear-file'): void
-  (e: 'precheck'): void
   (e: 'upload'): void
   (e: 'refresh-uploads'): void
   (e: 'delete-upload', record: MyPluginUploadRecord): void
@@ -38,29 +37,75 @@ const emit = defineEmits<{
   (e: 'go-login'): void
 }>()
 
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const isDragActive = ref(false)
+
 const isLoggedIn = computed(() => !!props.currentUser)
-const canSelectFile = computed(() => isLoggedIn.value && !props.isUploading)
-const canPrecheck = computed(
-  () =>
-    !!props.selectedFile &&
-    !props.validationError &&
-    !props.isHashing &&
-    !props.isCheckingHash &&
-    !props.isUploading &&
-    props.hashCheckResult === null,
-)
+const canSelectFile = computed(() => isLoggedIn.value && !props.isUploading && !props.isHashing && !props.isCheckingHash)
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(props.uploadsTotal / 20)),
 )
 
-function handleFileInput(event: Event): void {
-  const target = event.target as HTMLInputElement | null
-  const file = target?.files?.[0]
+/**
+ * 打开隐藏的单文件选择框；仅在登录且没有上传中的任务时响应上传区域点击。
+ */
+function openFilePicker(): void {
+  if (!canSelectFile.value) return
+  fileInputRef.value?.click()
+}
+
+/**
+ * 统一处理点击选择和拖拽上传来源，始终只取第一份插件包进入现有预检流程。
+ */
+function selectFirstFile(files: FileList | null | undefined): void {
+  const file = files?.[0]
   if (file) {
     emit('select-file', file)
   }
+}
+
+/**
+ * 接收原生文件选择结果并重置 input，让用户可以连续选择同一个文件重试。
+ */
+function handleFileInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  selectFirstFile(target?.files)
   if (target) {
     target.value = ''
+  }
+}
+
+/**
+ * 标记拖拽悬停状态，用于提示当前区域可以接收单个插件包文件。
+ */
+function handleDragEnter(): void {
+  if (canSelectFile.value) {
+    isDragActive.value = true
+  }
+}
+
+/**
+ * 清理拖拽悬停状态，避免离开上传区域后仍保持高亮。
+ */
+function handleDragLeave(): void {
+  isDragActive.value = false
+}
+
+/**
+ * 接收拖拽释放的文件列表，并复用单文件选择逻辑进入上传预检。
+ */
+function handleDrop(event: DragEvent): void {
+  isDragActive.value = false
+  if (!canSelectFile.value) return
+  selectFirstFile(event.dataTransfer?.files)
+}
+
+/**
+ * 触发上传记录刷新；按钮动画由父级传入的加载状态驱动。
+ */
+function handleRefreshUploads(): void {
+  if (!props.uploadsLoading) {
+    emit('refresh-uploads')
   }
 }
 
@@ -110,90 +155,116 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 
 <template>
   <div class="upload-panel">
-    <!-- Not logged in -->
     <div v-if="!isLoggedIn" class="panel-card section-card empty-card">
       <h3 class="section-title">登录后上传插件</h3>
+      <p class="panel-description">登录后可以提交插件包并查看自己的上传记录。</p>
       <div class="login-cta">
         <ZButton type="primary" @click="emit('go-login')">前往登录</ZButton>
       </div>
     </div>
 
-    <!-- Upload form + history -->
     <template v-else>
-      <div class="panel-card section-card">
-        <div class="section-header">
-          <h3 class="section-title">我的上传记录</h3>
-          <div class="section-actions">
-            <ZButton
-              type="primary"
-              :disabled="!canSelectFile"
-              @click="($refs.fileInput as HTMLInputElement | null)?.click()"
-            >
-              上传插件
-            </ZButton>
-            <ZButton
-              :disabled="uploadsLoading"
-              @click="emit('refresh-uploads')"
-            >
-              刷新
-            </ZButton>
-          </div>
-        </div>
-
+      <div class="panel-card section-card upload-card">
         <input
-          ref="fileInput"
+          ref="fileInputRef"
           type="file"
           accept=".zpx,.zip"
           class="hidden-input"
+          :disabled="!canSelectFile"
           @change="handleFileInput"
         />
 
-        <div v-if="selectedFile || validationError" class="upload-form">
-          <div class="file-input-row">
-            <span v-if="selectedFile" class="file-name">{{ selectedFile.name }}</span>
-            <span v-if="selectedFile" class="file-size">({{ formatSize(selectedFile.size) }})</span>
+        <div
+          class="upload-dropzone"
+          :class="{ 'is-drag-active': isDragActive, 'is-disabled': !canSelectFile }"
+          role="button"
+          :tabindex="canSelectFile ? 0 : -1"
+          :aria-disabled="!canSelectFile"
+          @click="openFilePicker"
+          @keydown.enter.prevent="openFilePicker"
+          @keydown.space.prevent="openFilePicker"
+          @dragenter.prevent="handleDragEnter"
+          @dragover.prevent="handleDragEnter"
+          @dragleave.prevent="handleDragLeave"
+          @drop.prevent="handleDrop"
+        >
+          <div class="dropzone-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 15.5V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5v2.25A2.25 2.25 0 007.25 20h9.5A2.25 2.25 0 0019 17.75V15.5"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <div class="dropzone-copy">
+            <strong>{{ selectedFile ? '已选择插件包' : '拖拽插件包到这里，或点击选择文件' }}</strong>
+            <span v-if="selectedFile" class="selected-file-line">
+              <span class="file-name">{{ selectedFile.name }}</span>
+              <span class="file-size">{{ formatSize(selectedFile.size) }}</span>
+            </span>
+            <span v-else>拖入多个文件时仅会使用第一个文件。</span>
+          </div>
+        </div>
+
+        <div v-if="validationError" class="validation-error">{{ validationError }}</div>
+
+        <div v-if="selectedFile && !validationError" class="upload-actions">
+          <div v-if="isHashing || isCheckingHash" class="hash-check-result hash-safe">
+            <span>{{ isHashing ? '计算哈希中...' : '预检中...' }}</span>
           </div>
 
-          <div v-if="validationError" class="validation-error">{{ validationError }}</div>
-
-          <div v-if="selectedFile && !validationError" class="upload-actions">
+          <div v-if="hashCheckResult" class="hash-check-result" :class="`hash-${hashCheckResult.status}`">
+            <span>{{ getHashCheckMessage() }}</span>
             <ZButton
-              v-if="hashCheckResult === null"
-              :disabled="!canPrecheck"
-              @click="emit('precheck')"
+              v-if="hashCheckResult.status === 'exists' && hashCheckResult.pluginName"
+              size="small"
+              @click="emit('open-plugin', hashCheckResult.pluginName!)"
             >
-              {{ isHashing ? '计算哈希中...' : isCheckingHash ? '预检中...' : '预检文件' }}
+              查看插件
             </ZButton>
-
-            <div v-if="hashCheckResult" class="hash-check-result" :class="`hash-${hashCheckResult.status}`">
-              <span>{{ getHashCheckMessage() }}</span>
-              <ZButton
-                v-if="hashCheckResult.status === 'exists' && hashCheckResult.pluginName"
-                size="small"
-                @click="emit('open-plugin', hashCheckResult.pluginName!)"
-              >
-                查看插件
-              </ZButton>
-            </div>
-
-            <div class="upload-button-row">
-              <ZButton
-                v-if="hashCheckResult?.status === 'safe'"
-                type="primary"
-                :disabled="!canUpload"
-                :loading="isUploading"
-                @click="emit('upload')"
-              >
-                确认上传
-              </ZButton>
-              <ZButton
-                :disabled="isUploading"
-                @click="emit('clear-file')"
-              >
-                清空
-              </ZButton>
-            </div>
           </div>
+
+          <div class="upload-button-row">
+            <ZButton
+              type="primary"
+              :disabled="!canUpload"
+              :loading="isUploading || isHashing || isCheckingHash"
+              @click="emit('upload')"
+            >
+              {{ isHashing ? '计算哈希中...' : isCheckingHash ? '预检中...' : '确认上传' }}
+            </ZButton>
+            <ZButton
+              :disabled="isUploading || isHashing || isCheckingHash"
+              @click="emit('clear-file')"
+            >
+              清空
+            </ZButton>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card section-card record-card">
+        <div class="section-header">
+          <h3 class="section-title">上传记录</h3>
+          <button
+            class="refresh-icon-btn"
+            :class="{ 'is-refreshing': uploadsLoading }"
+            type="button"
+            :disabled="uploadsLoading"
+            aria-label="刷新上传记录"
+            title="刷新上传记录"
+            @click="handleRefreshUploads"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path
+                d="M17.65 6.35A7.958 7.958 0 0012 4a8 8 0 107.73 10h-2.08A6 6 0 1116.22 7.78L13 11h7V4l-2.35 2.35z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
         </div>
 
         <div v-if="uploadsLoading && uploads.length === 0" class="loading-container">
@@ -270,13 +341,6 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   line-height: 1.6;
 }
 
-.panel-tip {
-  margin: 8px 0 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
 .section-card {
   display: flex;
   flex-direction: column;
@@ -294,6 +358,12 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   gap: 10px;
 }
 
+.section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -307,32 +377,77 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   color: var(--text-color);
 }
 
-.section-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.upload-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--divider-color);
-  border-radius: 8px;
-  background: var(--card-bg);
-  backdrop-filter: blur(40px) saturate(180%);
-}
-
 .hidden-input {
   display: none;
 }
 
-.file-input-row {
+.upload-dropzone {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+  min-height: 132px;
+  padding: 22px;
+  border: 1px dashed color-mix(in srgb, var(--primary-color) 36%, var(--divider-color));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary-color) 6%, var(--card-bg));
+  color: var(--text-color);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.is-drag-active,
+.upload-dropzone:focus-visible {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--card-bg));
+}
+
+.upload-dropzone.is-drag-active {
+  transform: translateY(-1px);
+}
+
+.upload-dropzone:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+
+.upload-dropzone.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.dropzone-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  color: var(--primary-color);
+}
+
+.dropzone-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dropzone-copy strong {
+  color: var(--text-color);
+  font-size: 15px;
+}
+
+.selected-file-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
@@ -390,6 +505,39 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   background: color-mix(in srgb, var(--warning-color, #e67e22) 10%, transparent);
 }
 
+.refresh-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--divider-color);
+  border-radius: 9px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.refresh-icon-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary-color) 45%, var(--divider-color));
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--surface-elevated));
+  color: var(--primary-color);
+}
+
+.refresh-icon-btn:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.refresh-icon-btn svg {
+  transform-origin: center;
+}
+
+.refresh-icon-btn.is-refreshing svg {
+  animation: refresh-spin 0.8s linear infinite;
+}
+
 .loading-container,
 .error-container {
   display: flex;
@@ -413,10 +561,6 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   border-top-color: var(--primary-color);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .empty-message {
@@ -544,14 +688,6 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   background: color-mix(in srgb, var(--success-color, #27ae60) 12%, transparent);
 }
 
-.btn-danger {
-  color: var(--danger-color, #e74c3c);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger-color, #e74c3c) 12%, transparent);
-}
-
 .pagination-row {
   display: flex;
   align-items: center;
@@ -561,5 +697,26 @@ function canDelete(record: MyPluginUploadRecord): boolean {
 .pagination-text {
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .upload-dropzone,
+  .upload-record {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .record-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style>

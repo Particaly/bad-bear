@@ -57,7 +57,7 @@ export function usePluginMarketUploads(options: {
       !isHashing.value &&
       !isCheckingHash.value &&
       !isUploading.value &&
-      hashCheckResult.value?.status === 'safe',
+      (!hashCheckResult.value || hashCheckResult.value.status === 'safe'),
   )
 
   function validateFile(file: File): string {
@@ -78,14 +78,16 @@ export function usePluginMarketUploads(options: {
     hashCheckResult.value = null
   }
 
-  async function computeHashAndPrecheck(): Promise<void> {
+  /**
+   * 计算当前插件包的 SHA-256 并请求服务端检查重复、封禁或处理中状态；哈希或预检失败时仍允许上传，由后端最终拦截。
+   */
+  async function computeHashAndPrecheck(): Promise<HashCheckState> {
     const file = selectedFile.value
-    if (!file || validationError.value) return
+    if (!file || validationError.value) return hashCheckResult.value
 
     hashCheckResult.value = null
     computedHash.value = ''
 
-    // Try browser crypto for SHA-256
     isHashing.value = true
     try {
       const buffer = await file.arrayBuffer()
@@ -94,14 +96,12 @@ export function usePluginMarketUploads(options: {
       const hex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
       computedHash.value = `sha256:${hex}`
     } catch {
-      // Hash computation failed - skip precheck, allow upload anyway
       isHashing.value = false
       hashCheckResult.value = { status: 'safe' }
-      return
+      return hashCheckResult.value
     }
     isHashing.value = false
 
-    // Call precheck API
     isCheckingHash.value = true
     try {
       const response = await checkPluginUploadHash(computedHash.value)
@@ -111,16 +111,25 @@ export function usePluginMarketUploads(options: {
         version: response.version,
       }
     } catch {
-      // Precheck failed - allow upload, backend remains authoritative
       hashCheckResult.value = { status: 'safe' }
     } finally {
       isCheckingHash.value = false
     }
+
+    return hashCheckResult.value
   }
 
+  /**
+   * 响应确认上传操作：先执行哈希预检，只有预检安全或预检不可用时才提交插件包。
+   */
   async function performUpload(): Promise<{ success: boolean; reviewTaskId?: string }> {
     const file = selectedFile.value
     if (!file || !canUpload.value) return { success: false }
+
+    const precheckResult = await computeHashAndPrecheck()
+    if (precheckResult?.status !== 'safe') {
+      return { success: false }
+    }
 
     isUploading.value = true
     try {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { ZButton, ZModal, ZPagination, ZTag } from 'ztools-ui'
+import { computed, ref } from 'vue'
+import { ZButton, ZContextMenu, ZModal, ZPagination, ZTag } from 'ztools-ui'
+import type { ContextMenuItem } from 'ztools-ui'
 import type { AuthUser } from '../../types/auth'
 import type {
   NotificationFilter,
@@ -48,6 +49,31 @@ const canGoPrev = computed(() => props.page > 1)
 const canGoNext = computed(() => props.page < totalPages.value)
 const canMarkAllRead = computed(() => !!props.currentUser && props.unreadTotal > 0 && !props.markingAllRead)
 const shouldShowPagination = computed(() => props.total > 0)
+const actionMenuShow = ref(false)
+const actionMenuX = ref(0)
+const actionMenuY = ref(0)
+
+const notificationMenuItems = computed<ContextMenuItem[]>(() => [
+  ...filterOptions.map<ContextMenuItem>(option => ({
+    key: `filter:${option.value}`,
+    label: option.label,
+    shortcut: option.value === props.filter ? '当前' : undefined,
+    disabled: option.value === props.filter,
+  })),
+  { type: 'separator' },
+  {
+    type: 'submenu',
+    key: 'actions',
+    label: '操作',
+    children: [
+      {
+        key: 'mark-all-read',
+        label: props.markingAllRead ? '标记中...' : '全部已读',
+        disabled: !canMarkAllRead.value,
+      },
+    ],
+  },
+])
 
 const emptyStateText = computed(() => {
   if (props.filter === 'UNREAD') {
@@ -89,6 +115,24 @@ function openItem(item: NotificationTreeNode): void {
   emit('open-item', item)
 }
 
+function showActionMenu(event: MouseEvent | FocusEvent): void {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  actionMenuX.value = rect.right - 160
+  actionMenuY.value = rect.bottom + 8
+  actionMenuShow.value = true
+}
+
+function handleNotificationMenuSelect(key: string): void {
+  if (key.startsWith('filter:')) {
+    handleChangeFilter(key.slice('filter:'.length) as NotificationFilter)
+    return
+  }
+
+  if (key === 'mark-all-read') {
+    emit('mark-all-read')
+  }
+}
+
 function closeDetail(): void {
   emit('close-detail')
 }
@@ -108,26 +152,33 @@ function closeDetail(): void {
     <template v-else>
       <div class="panel-card section-card">
         <div class="notification-toolbar">
-          <div class="filter-tabs" role="tablist" aria-label="通知筛选">
-            <button
-              v-for="option in filterOptions"
-              :key="option.value"
-              class="filter-tab"
-              :class="{ active: filter === option.value }"
-              type="button"
-              @click="handleChangeFilter(option.value)"
-            >
-              {{ option.label }}
-            </button>
+          <div class="notification-toolbar-title">
+            <h3 class="section-title">通知</h3>
           </div>
-          <ZButton
-            type="primary"
-            :disabled="!canMarkAllRead"
-            :loading="markingAllRead"
-            @click="emit('mark-all-read')"
-          >
-            全部已读
-          </ZButton>
+          <div class="notification-menu-wrap">
+            <ZContextMenu
+              v-model:show="actionMenuShow"
+              :menu-items="notificationMenuItems"
+              :x="actionMenuX"
+              :y="actionMenuY"
+              to="body"
+              @select="handleNotificationMenuSelect"
+            >
+              <button
+                class="notification-menu-trigger"
+                type="button"
+                aria-label="通知筛选与操作"
+                :aria-expanded="actionMenuShow"
+                @mouseenter="showActionMenu"
+                @focus="showActionMenu"
+              >
+                <span class="notification-menu-trigger__dot" :class="{ active: unreadTotal > 0 }"></span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="notification-menu-trigger__icon">
+                  <path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </button>
+            </ZContextMenu>
+          </div>
         </div>
 
         <div v-if="loading" class="loading-container">
@@ -394,31 +445,57 @@ function closeDetail(): void {
   flex-shrink: 0;
 }
 
-.filter-tabs {
+.notification-toolbar-title {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--surface-elevated);
+  gap: 10px;
+  min-width: 0;
 }
 
-.filter-tab {
-  min-width: 68px;
-  padding: 8px 14px;
-  border: 2px solid var(--primary-color);
+.notification-menu-wrap {
+  display: inline-flex;
+}
+
+.notification-menu-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--divider-color);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.notification-menu-trigger:hover,
+.notification-menu-trigger:focus-visible,
+.notification-menu-trigger[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--primary-color) 36%, var(--divider-color));
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--surface-elevated));
+  color: var(--primary-color);
+}
+
+.notification-menu-trigger__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.notification-menu-trigger__dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-.filter-tab.active {
-  border-color: var(--primary-color);
-  background: var(--primary-color);
-  color: var(--text-on-primary);
+.notification-menu-trigger__dot.active {
+  background: #ef4444;
+  box-shadow: 0 0 0 2px var(--surface-elevated);
 }
 
 .notification-list {

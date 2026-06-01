@@ -139,10 +139,6 @@ export interface PluginReadmeResponse extends OperationResult {
   content?: string
 }
 
-export interface PluginPackageResult extends OperationResult {
-  filePath?: string
-}
-
 export interface HashFileResult extends OperationResult {
   hash?: string
   algorithm?: string
@@ -183,12 +179,16 @@ export interface PluginUpdateCheckResponseItem {
 }
 
 export type MyPluginUploadStatus =
-  | 'PENDING'
-  | 'RUNNING'
-  | 'FAILED'
-  | 'REJECTED'
-  | 'CANCELED'
+  | 'AI_CLASSIFYING'
+  | 'AI_REVIEWING'
+  | 'MANUAL_REVIEW'
   | 'PUBLISHED'
+  | 'PUBLISH_FAILED'
+
+export interface MyPluginUploadProgress {
+  code: MyPluginUploadStatus
+  label: string
+}
 
 export interface MyPluginUploadRecord {
   id: string
@@ -198,6 +198,7 @@ export interface MyPluginUploadRecord {
   fileSize: number
   createdAt: string
   status: MyPluginUploadStatus
+  progress?: MyPluginUploadProgress
   downloads: number
 }
 

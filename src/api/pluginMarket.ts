@@ -12,6 +12,7 @@ export {
   checkPluginUploadHash,
   checkPluginUpdates,
   getMyPluginUploads,
+  getMyPluginUpload,
   deleteMyPluginUpload,
   uploadPluginPackage,
 } from './pluginMarketRemote'

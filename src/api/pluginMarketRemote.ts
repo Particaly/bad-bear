@@ -9,6 +9,7 @@ import {
 import type {
   CreatePluginCommentRequest,
   CreatePluginRatingRequest,
+  MyPluginUploadRecord,
   MyPluginUploadsQuery,
   MyPluginUploadsResponse,
   Platform,
@@ -576,6 +577,9 @@ export function checkPluginUpdates(
   })
 }
 
+/**
+ * 分页读取当前用户的上传记录，列表中的 id 与上传接口返回的 reviewTaskId 一致。
+ */
 export function getMyPluginUploads(query?: MyPluginUploadsQuery): Promise<MyPluginUploadsResponse> {
   return requestJson<MyPluginUploadsResponse>({
     path: appendQuery('/api/v1/plugins/me/uploads', {
@@ -586,6 +590,18 @@ export function getMyPluginUploads(query?: MyPluginUploadsQuery): Promise<MyPlug
   })
 }
 
+/**
+ * 按上传任务 ID 查询单条记录，用于上传接口返回后立即刷新该次处理进度。
+ */
+export function getMyPluginUpload(id: string): Promise<MyPluginUploadRecord> {
+  return requestJson<MyPluginUploadRecord>({
+    path: `/api/v1/plugins/me/uploads/${encodeURIComponent(id)}`,
+  })
+}
+
+/**
+ * 删除当前用户的一次上传记录；未发布记录由服务端保留并标记为发布失败。
+ */
 export function deleteMyPluginUpload(id: string): Promise<{ message?: string } | null> {
   return requestJson<{ message?: string } | null>({
     path: `/api/v1/plugins/me/uploads/${encodeURIComponent(id)}`,

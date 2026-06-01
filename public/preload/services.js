@@ -9,52 +9,6 @@ if (typeof globalThis.Buffer === 'undefined') {
 const fs = require('node:fs')
 const { createHash } = require('node:crypto')
 const path = require('node:path')
-const { pipeline } = require('node:stream/promises')
-const { createBrotliCompress, constants: zlibConstants } = require('node:zlib')
-
-function createMissingDependencyError(packageName, error) {
-  const reason = error instanceof Error ? error.message : String(error)
-  return new Error(
-    `Preload 依赖缺失：${packageName}。请在 public/preload 目录重新安装依赖。原始错误：${reason}`,
-  )
-}
-
-function requireDependency(packageName) {
-  try {
-    return require(packageName)
-  } catch (error) {
-    throw createMissingDependencyError(packageName, error)
-  }
-}
-
-let asarCache = null
-
-function loadAsar() {
-  if (asarCache) {
-    return asarCache
-  }
-
-  asarCache = requireDependency('@electron/asar')
-  return asarCache
-}
-
-function createTempFilePath(extension) {
-  const random = Math.random().toString(36).slice(2, 8)
-  return path.join(require('node:os').tmpdir(), `zpx-${Date.now()}-${random}${extension}`)
-}
-
-async function cleanupTempFile(filePath) {
-  const previousNoAsar = process.noAsar
-  process.noAsar = true
-
-  try {
-    await fs.promises.unlink(filePath)
-  } catch {
-    // ignore
-  } finally {
-    process.noAsar = previousNoAsar
-  }
-}
 
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
@@ -195,65 +149,6 @@ window.services = {
     console.log('[Preload] copyDirectory:', src, '->', dest)
     fs.cpSync(src, dest, { recursive: true })
     console.log('[Preload] copyDirectory complete')
-  },
-
-  // ===== 插件打包能力 =====
-
-  /**
-   * 将目录打包为 zpx 文件（zpx = brotli(asar)）
-   */
-  async packZpx(sourceDir, outputPath) {
-    const asar = loadAsar()
-    const tempAsarPath = createTempFilePath('.asar')
-    const previousNoAsar = process.noAsar
-    process.noAsar = true
-
-    try {
-      console.log('[Preload] packZpx create asar:', { sourceDir, tempAsarPath })
-      await asar.createPackage(sourceDir, tempAsarPath)
-      console.log('[Preload] packZpx compress asar -> zpx:', {
-        tempAsarPath,
-        outputPath,
-      })
-      await pipeline(
-        fs.createReadStream(tempAsarPath),
-        createBrotliCompress({
-          params: {
-            [zlibConstants.BROTLI_PARAM_QUALITY]: 5,
-          },
-        }),
-        fs.createWriteStream(outputPath),
-      )
-      console.log('[Preload] packZpx complete')
-    } finally {
-      process.noAsar = previousNoAsar
-      await cleanupTempFile(tempAsarPath)
-    }
-  },
-
-  /**
-   * 将插件目录打包到系统临时目录，返回临时 zpx 路径
-   */
-  async packagePluginToTempZpx(sourceDir) {
-    console.log('[Preload] packagePluginToTempZpx:', sourceDir)
-    if (!fs.existsSync(sourceDir)) {
-      throw new Error(`插件目录不存在: ${sourceDir}`)
-    }
-
-    const stats = fs.statSync(sourceDir)
-    if (!stats.isDirectory()) {
-      throw new Error(`插件路径不是目录: ${sourceDir}`)
-    }
-
-    const outputPath = createTempFilePath('.zpx')
-    try {
-      await window.services.packZpx(sourceDir, outputPath)
-      console.log('[Preload] packagePluginToTempZpx complete:', outputPath)
-      return outputPath
-    } catch (error) {
-      window.services.removeFile(outputPath)
-      throw error
-    }
   },
 }
 

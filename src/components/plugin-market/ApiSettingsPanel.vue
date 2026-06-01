@@ -49,6 +49,8 @@ const resourceCards: ResourceCard[] = [
 
 const draftBaseUrl = ref(props.baseUrl)
 const showDeveloperSettings = ref(false)
+const appVersion = __APP_VERSION__
+const appWebsiteUrl = 'https://badbear.ydys.cc'
 
 watch(
   () => props.baseUrl,
@@ -148,6 +150,11 @@ function openResourceCard(url: string): void {
         </button>
       </div>
     </div>
+
+    <footer class="settings-signature">
+      <span>🐻</span>@<a class="settings-version-link" :href="appWebsiteUrl" target="_blank" rel="noopener noreferrer">{{ appVersion }}</a>
+      created with <span>☕️</span> and <span>🍯</span>
+    </footer>
   </div>
 </template>
 
@@ -156,6 +163,7 @@ function openResourceCard(url: string): void {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 100%;
 }
 
 .panel-card {
@@ -258,6 +266,28 @@ function openResourceCard(url: string): void {
   font-weight: 600;
   line-height: 1.4;
   text-align: left;
+}
+
+.settings-signature {
+  margin-top: auto;
+  padding-top: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+  span {
+    font-size: 24px;
+  }
+}
+
+.settings-version-link {
+  color: var(--primary-color);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.settings-version-link:hover {
+  text-decoration: none;
 }
 
 .settings-card {

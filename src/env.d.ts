@@ -11,7 +11,6 @@ import type {
   PluginMarketFetchResponse,
   PluginMarketPlugin,
   PluginMutationResult,
-  PluginPackageResult,
   PluginReadmeResponse,
 } from './types/pluginMarket'
 
@@ -51,8 +50,6 @@ interface Services {
   removeFile: (filePath: string) => void
   copyFile: (src: string, dest: string) => void
   copyDirectory: (src: string, dest: string) => void
-  packZpx: (sourceDir: string, outputPath: string) => Promise<void>
-  packagePluginToTempZpx: (sourceDir: string) => Promise<string>
 }
 
 interface ImageAnalysisResult {
@@ -80,7 +77,6 @@ interface ZToolsInternal {
   reloadPlugin?(pluginPath: string): Promise<OperationResult>
   killPlugin?(pluginPath: string): Promise<OperationResult>
   revealInFinder?(targetPath: string): Promise<void>
-  packagePlugin?(pluginPath: string): Promise<PluginPackageResult>
   computeFileHash?(filePath: string, algorithm?: 'sha256'): Promise<HashFileResult>
   analyzeImage?(src: string): Promise<ImageAnalysisResult>
   startHotkeyRecording?(): Promise<HotkeyRecordingResult>
@@ -100,6 +96,8 @@ interface ZToolsApi {
 }
 
 declare global {
+  const __APP_VERSION__: string
+
   interface Window {
     services: Services
     ztools: ZToolsApi

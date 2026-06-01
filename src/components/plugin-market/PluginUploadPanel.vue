@@ -109,26 +109,34 @@ function handleRefreshUploads(): void {
   }
 }
 
-function getStatusLabel(status: MyPluginUploadStatus): string {
-  switch (status) {
-    case 'PENDING': return '等待审查'
-    case 'RUNNING': return '审查中'
-    case 'FAILED': return '失败'
-    case 'REJECTED': return '已拒绝'
-    case 'CANCELED': return '已取消'
+/**
+ * 优先展示服务端进度文案，兼容列表仅返回状态码时的本地兜底文案。
+ */
+function getStatusLabel(record: MyPluginUploadRecord): string {
+  if (record.progress?.label) {
+    return record.progress.label
+  }
+
+  switch (record.status) {
+    case 'AI_CLASSIFYING': return 'AI分类中'
+    case 'AI_REVIEWING': return 'AI审查中'
+    case 'MANUAL_REVIEW': return '人工审核'
     case 'PUBLISHED': return '已发布'
-    default: return status
+    case 'PUBLISH_FAILED': return '发布失败'
+    default: return record.status
   }
 }
 
+/**
+ * 将上传进度状态映射为对应的视觉层级，区分 AI 处理中、人工审核、发布成功和发布失败。
+ */
 function getStatusClass(status: MyPluginUploadStatus): string {
   switch (status) {
-    case 'PENDING': return 'status-pending'
-    case 'RUNNING': return 'status-running'
-    case 'FAILED': return 'status-failed'
-    case 'REJECTED': return 'status-rejected'
-    case 'CANCELED': return 'status-canceled'
+    case 'AI_CLASSIFYING': return 'status-ai-classifying'
+    case 'AI_REVIEWING': return 'status-ai-reviewing'
+    case 'MANUAL_REVIEW': return 'status-manual-review'
     case 'PUBLISHED': return 'status-published'
+    case 'PUBLISH_FAILED': return 'status-publish-failed'
     default: return ''
   }
 }
@@ -148,8 +156,11 @@ function isDeleting(id: string): boolean {
   return props.deletingIds.has(id)
 }
 
+/**
+ * 仅允许删除已发布版本或取消人工审核中的上传；发布失败记录由服务端保留为最终进度，不再展示删除入口。
+ */
 function canDelete(record: MyPluginUploadRecord): boolean {
-  return record.status !== 'PENDING' && record.status !== 'RUNNING'
+  return record.status === 'PUBLISHED' || record.status === 'MANUAL_REVIEW'
 }
 </script>
 
@@ -290,12 +301,12 @@ function canDelete(record: MyPluginUploadRecord): boolean {
                 <span class="record-filename">{{ record.originalName }}</span>
                 <span>{{ formatSize(record.fileSize) }}</span>
                 <span>{{ formatDateTime(record.createdAt) }}</span>
-                <span>{{ formatDownloads(record.downloads) }} 次下载</span>
+                <span v-if="record.status === 'PUBLISHED'">{{ formatDownloads(record.downloads) }} 次下载</span>
               </div>
             </div>
             <div class="record-actions">
               <span class="status-badge" :class="getStatusClass(record.status)">
-                {{ getStatusLabel(record.status) }}
+                {{ getStatusLabel(record) }}
               </span>
               <ZButton
                 v-if="canDelete(record)"
@@ -658,29 +669,24 @@ function canDelete(record: MyPluginUploadRecord): boolean {
   white-space: nowrap;
 }
 
-.status-pending {
-  color: var(--text-secondary);
-  background: var(--surface-elevated);
-}
-
-.status-running {
+.status-ai-classifying {
   color: var(--primary-color);
   background: color-mix(in srgb, var(--primary-color) 12%, transparent);
 }
 
-.status-failed {
-  color: var(--danger-color, #e74c3c);
-  background: color-mix(in srgb, var(--danger-color, #e74c3c) 12%, transparent);
+.status-ai-reviewing {
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
 }
 
-.status-rejected {
-  color: var(--danger-color, #e74c3c);
-  background: color-mix(in srgb, var(--danger-color, #e74c3c) 12%, transparent);
+.status-manual-review {
+  color: var(--warning-color, #e67e22);
+  background: color-mix(in srgb, var(--warning-color, #e67e22) 12%, transparent);
 }
 
-.status-canceled {
-  color: var(--text-secondary);
-  background: var(--surface-elevated);
+.status-publish-failed {
+  color: var(--danger-color, #e74c3c);
+  background: color-mix(in srgb, var(--danger-color, #e74c3c) 12%, transparent);
 }
 
 .status-published {

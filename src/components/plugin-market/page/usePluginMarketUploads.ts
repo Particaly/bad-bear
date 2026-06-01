@@ -2,6 +2,7 @@ import { computed, ref, type Ref } from 'vue'
 import {
   checkPluginUploadHash,
   deleteMyPluginUpload,
+  getMyPluginUpload,
   getMyPluginUploads,
   uploadPluginPackage,
 } from '../../../api/pluginMarket'
@@ -16,6 +17,8 @@ import { getErrorMessage } from './shared'
 
 const MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 const UPLOADS_PAGE_SIZE = 20
+const PROCESSING_UPLOAD_STATUSES = new Set(['AI_CLASSIFYING', 'AI_REVIEWING'])
+const DELETABLE_UPLOAD_STATUSES = new Set(['PUBLISHED', 'MANUAL_REVIEW'])
 
 type HashCheckState = Pick<PluginHashCheckResponse, 'status' | 'pluginName' | 'version'> | null
 
@@ -120,7 +123,39 @@ export function usePluginMarketUploads(options: {
   }
 
   /**
-   * 响应确认上传操作：先执行哈希预检，只有预检安全或预检不可用时才提交插件包。
+   * 用单条进度接口返回的最新记录更新当前分页列表；若当前页未包含该记录则插入到顶部便于用户立即看到进度。
+   */
+  function upsertUploadRecord(record: MyPluginUploadRecord): void {
+    const existingIndex = uploads.value.findIndex((item) => item.id === record.id)
+    if (existingIndex >= 0) {
+      const nextUploads = [...uploads.value]
+      nextUploads[existingIndex] = record
+      uploads.value = nextUploads
+      return
+    }
+
+    uploads.value = [record, ...uploads.value].slice(0, UPLOADS_PAGE_SIZE)
+    uploadsTotal.value += 1
+  }
+
+  /**
+   * 按上传接口返回的 reviewTaskId 拉取该次记录，避免等待列表刷新才能看到新进度。
+   */
+  async function refreshUploadProgress(reviewTaskId: string | undefined): Promise<void> {
+    if (!reviewTaskId || !options.authToken.value || !options.currentUser.value) {
+      return
+    }
+
+    try {
+      const record = await getMyPluginUpload(reviewTaskId)
+      upsertUploadRecord(record)
+    } catch (error) {
+      console.warn('[PluginMarket] 刷新上传进度失败:', error)
+    }
+  }
+
+  /**
+   * 响应确认上传操作：先执行哈希预检，提交成功后再用 reviewTaskId 拉取单次进度记录。
    */
   async function performUpload(): Promise<{ success: boolean; reviewTaskId?: string }> {
     const file = selectedFile.value
@@ -146,6 +181,7 @@ export function usePluginMarketUploads(options: {
       options.notifySuccess(result.message || '插件上传成功，正在后台处理中')
       selectFile(null)
       await loadUploads()
+      await refreshUploadProgress(result.reviewTaskId)
       return { success: true, reviewTaskId: result.reviewTaskId }
     } catch (error) {
       options.notifyError(getErrorMessage(error, '上传失败'))
@@ -188,15 +224,21 @@ export function usePluginMarketUploads(options: {
 
   async function handleDeleteUpload(record: MyPluginUploadRecord): Promise<void> {
     if (deletingIds.value.has(record.id)) return
-    if (record.status === 'PENDING' || record.status === 'RUNNING') {
+    if (PROCESSING_UPLOAD_STATUSES.has(record.status)) {
       options.notifyError('正在处理的记录不可删除')
+      return
+    }
+    if (!DELETABLE_UPLOAD_STATUSES.has(record.status)) {
+      options.notifyError('该上传记录已是最终状态，无需删除')
       return
     }
 
     const confirmed = await options.confirmAction({
       title: '确认删除',
       message: `确定删除 ${record.originalName} 的上传记录吗？${
-        record.status === 'PUBLISHED' ? '该记录已发布，删除后对应插件版本也会同步删除。' : ''
+        record.status === 'PUBLISHED'
+          ? '该记录已发布，删除后对应插件版本也会同步删除。'
+          : '该记录将保留并标记为发布失败。'
       }`,
       type: 'danger',
       confirmText: '删除',

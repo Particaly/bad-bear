@@ -1,6 +1,4 @@
 {
   "type": "commonjs",
-  "dependencies": {
-    "@electron/asar": "^3.2.18"
-  }
+  "dependencies": {}
 }

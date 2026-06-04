@@ -14,6 +14,7 @@ import {
 } from '../../api/pluginMarket'
 import { useToast } from '../common/Toast'
 import { useMarketRiskDialog } from '../../app/useMarketRiskDialog'
+import authGuideImage from '../../assets/image/image.png?url'
 import type {
   CategoryInfo,
   CategoryLayoutSection,
@@ -105,7 +106,15 @@ const {
   handleMarketRiskConfirm,
   handleMarketRiskCancel,
   handleMarketRiskVisibleChange,
+  internalApiAuthGuideVisible,
+  hasDismissedInternalApiAuthGuide,
+  pluginName,
+  openInternalApiAuthGuide,
+  closeInternalApiAuthGuide,
+  dismissInternalApiAuthGuide,
 } = useMarketRiskDialog()
+
+let authGuideTimerId: ReturnType<typeof setTimeout> | null = null
 
 function notifyError(message: string) {
   showErrorToast(message)
@@ -814,6 +823,69 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+/**
+ * 清理授权引导定时器，避免离开组件或授权恢复后误触发。
+ */
+function clearAuthGuideTimer(): void {
+  if (authGuideTimerId !== null) {
+    clearTimeout(authGuideTimerId)
+    authGuideTimerId = null
+  }
+}
+
+/**
+ * 尝试展示内部 API 授权引导弹窗。
+ * 实时检查：未授权、用户未点过"不再弹出"、当前未重复展示。
+ */
+function tryShowInternalApiAuthGuide(): void {
+  if (
+    canUseInternalPluginApis.value === false &&
+    !hasDismissedInternalApiAuthGuide.value &&
+    !internalApiAuthGuideVisible.value
+  ) {
+    openInternalApiAuthGuide()
+  }
+}
+
+/**
+ * 调度授权引导弹窗：风险提示关闭后延迟 1 秒展示。
+ * 每次调度前先清理旧定时器，避免重复定时器叠加。
+ */
+function scheduleAuthGuide(): void {
+  clearAuthGuideTimer()
+  authGuideTimerId = setTimeout(() => {
+    authGuideTimerId = null
+    tryShowInternalApiAuthGuide()
+  }, 1000)
+}
+
+/**
+ * 复制插件名称到剪贴板。
+ */
+async function copyPluginName(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(pluginName)
+    showSuccessToast('已复制到剪贴板')
+  } catch (error) {
+    console.error('[BadBear] Failed to copy plugin name:', error)
+    showErrorToast('复制失败，请手动复制')
+  }
+}
+
+/**
+ * 处理"我知道了"按钮，本次关闭授权引导但不持久化偏好。
+ */
+function handleAuthGuideClose(): void {
+  closeInternalApiAuthGuide()
+}
+
+/**
+ * 处理"不再弹出"按钮，关闭并持久化"不再弹出"偏好。
+ */
+function handleAuthGuideDismiss(): void {
+  dismissInternalApiAuthGuide()
+}
+
 watch(
   () => selectedPlugin.value?.name,
   (pluginName) => {
@@ -830,6 +902,14 @@ watch(canUseInternalPluginApis, (enabled) => {
   if (!enabled && activeNav.value === 'installed') {
     activeNav.value = 'store'
     selectedPluginName.value = null
+  }
+
+  // 授权恢复时，取消未触发的定时器并关闭引导，不写入"不再弹出"
+  if (enabled) {
+    clearAuthGuideTimer()
+    if (internalApiAuthGuideVisible.value) {
+      closeInternalApiAuthGuide()
+    }
   }
 })
 
@@ -885,7 +965,13 @@ onMounted(() => {
   void reloadMarket()
   window.ztools.onPluginEnter(() => {
     if (!hasDismissedMarketRiskDialog.value) {
-      void openMarketRiskDialog()
+      void openMarketRiskDialog().then((confirmed) => {
+        if (confirmed) {
+          scheduleAuthGuide()
+        }
+      })
+    } else {
+      scheduleAuthGuide()
     }
   })
   window.addEventListener('keydown', handleKeydown, true)
@@ -894,6 +980,7 @@ onMounted(() => {
 onUnmounted(() => {
   marketReloadAbortController?.abort()
   unregisterSubInput()
+  clearAuthGuideTimer()
   window.removeEventListener('keydown', handleKeydown, true)
 })
 </script>
@@ -936,6 +1023,42 @@ onUnmounted(() => {
         </div>
       </div>
     </ZModal>
+
+    <ZModal
+      :show="internalApiAuthGuideVisible"
+      to="body"
+      :mask-closable="true"
+      :close-on-esc="true"
+      @update:show="internalApiAuthGuideVisible = $event"
+    >
+      <div class="auth-guide-modal" role="dialog" aria-modal="true" aria-label="内部 API 授权引导">
+        <div class="auth-guide-modal__header">
+          <h3 class="auth-guide-modal__title">需要授权内部 API</h3>
+        </div>
+        <div class="auth-guide-modal__body">
+          <img :src="authGuideImage" alt="授权引导" class="auth-guide-modal__image" />
+          <div class="auth-guide-modal__instruction">
+            <div class="auth-guide-modal__text">
+              请到 ZTools 设置页下滑到"内部API授权插件"处，输入并添加以下插件名称：
+            </div>
+            <div class="auth-guide-modal__plugin-name-block">
+              <code class="auth-guide-modal__plugin-name">{{ pluginName }}</code>
+              <ZButton size="small" @click="copyPluginName">复制</ZButton>
+            </div>
+            <div class="auth-guide-modal__text">
+              授权后重新打开插件即可正常使用。
+            </div>
+          </div>
+        </div>
+        <div class="auth-guide-modal__footer">
+          <div class="auth-guide-modal__actions">
+            <ZButton @click="handleAuthGuideClose">我知道了</ZButton>
+            <ZButton type="primary" @click="handleAuthGuideDismiss">不再弹出</ZButton>
+          </div>
+        </div>
+      </div>
+    </ZModal>
+
     <aside class="side-nav">
       <div class="side-nav-header">
         <div class="side-nav-title">邪恶的熊</div>
@@ -1497,6 +1620,97 @@ onUnmounted(() => {
 }
 
 .market-risk-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.auth-guide-modal {
+  width: min(600px, calc(100vw - 32px));
+  max-height: 90vh;
+  border-radius: 16px;
+  background: var(--surface-color, var(--bg-color));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  color: var(--text-color);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-guide-modal__header {
+  flex-shrink: 0;
+  padding: 20px 20px 12px;
+  border-bottom: 1px solid var(--divider-color);
+}
+
+.auth-guide-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.auth-guide-modal__body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.auth-guide-modal__image {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--divider-color);
+}
+
+.auth-guide-modal__instruction {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--surface-elevated, var(--hover-bg));
+}
+
+.auth-guide-modal__text {
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.auth-guide-modal__plugin-name-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 2px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+}
+
+.auth-guide-modal__plugin-name {
+  flex: 1;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.auth-guide-modal__footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--divider-color);
+}
+
+.auth-guide-modal__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;

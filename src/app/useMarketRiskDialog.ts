@@ -39,6 +39,12 @@ const MARKET_RISK_ITEMS = [
 ] as const
 
 /**
+ * 插件内部 API 授权引导相关常量
+ */
+const PLUGIN_NAME = 'bad-bear'
+const INTERNAL_API_AUTH_GUIDE_KEY = 'bad-bear-internal-api-auth-guide-dismissed'
+
+/**
  * 根据固定风险文案创建新的勾选项，确保每次打开弹框都需要重新逐项确认。
  */
 function createMarketRiskChecklistItems(): MarketRiskChecklistItem[] {
@@ -67,10 +73,23 @@ function createMarketRiskDialogState(): MarketRiskDialogState {
 export function useMarketRiskDialog() {
   const marketRiskDialogState = ref<MarketRiskDialogState>(createMarketRiskDialogState())
   const hasConfirmedMarketRiskDialogInSession = ref(false)
+  const internalApiAuthGuideVisible = ref(false)
 
   const hasDismissedMarketRiskDialog = computed(() => {
     try {
       return localStorage.getItem(MARKET_RISK_DIALOG_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  /**
+   * 判断用户是否已主动选择不再显示内部 API 授权引导弹窗。
+   * 仅在未授权时用户点击"不再弹出"后持久化，授权成功导致的关闭不写入。
+   */
+  const hasDismissedInternalApiAuthGuide = computed(() => {
+    try {
+      return localStorage.getItem(INTERNAL_API_AUTH_GUIDE_KEY) === '1'
     } catch {
       return false
     }
@@ -199,6 +218,34 @@ export function useMarketRiskDialog() {
     resolve?.(false)
   }
 
+  /**
+   * 打开内部 API 授权引导弹窗。
+   * 仅在 canUseInternalPluginApis 为 false 且用户未点过"不再弹出"时显示。
+   */
+  function openInternalApiAuthGuide(): void {
+    internalApiAuthGuideVisible.value = true
+  }
+
+  /**
+   * 关闭授权引导弹窗，本次关闭不持久化偏好。
+   */
+  function closeInternalApiAuthGuide(): void {
+    internalApiAuthGuideVisible.value = false
+  }
+
+  /**
+   * 关闭授权引导弹窗并持久化"不再弹出"偏好。
+   * 仅在未授权时用户主动点击"不再弹出"时调用。
+   */
+  function dismissInternalApiAuthGuide(): void {
+    internalApiAuthGuideVisible.value = false
+    try {
+      localStorage.setItem(INTERNAL_API_AUTH_GUIDE_KEY, '1')
+    } catch (error) {
+      console.warn('[BadBear] Failed to persist internal API auth guide preference:', error)
+    }
+  }
+
   return {
     marketRiskDialogState,
     hasDismissedMarketRiskDialog,
@@ -213,5 +260,11 @@ export function useMarketRiskDialog() {
     handleMarketRiskConfirm,
     handleMarketRiskCancel,
     handleMarketRiskVisibleChange,
+    internalApiAuthGuideVisible,
+    hasDismissedInternalApiAuthGuide,
+    pluginName: PLUGIN_NAME,
+    openInternalApiAuthGuide,
+    closeInternalApiAuthGuide,
+    dismissInternalApiAuthGuide,
   }
 }

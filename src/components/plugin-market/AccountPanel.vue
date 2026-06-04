@@ -725,10 +725,9 @@ function handleAvatarChange(event: Event): void {
               </span>
             </ZButton>
             <ZButton type="primary" :disabled="busy" :loading="isLoggingIn" @click="submitLogin">
-              登录
+              立即登录
             </ZButton>
           </div>
-          <div class="auth-status">首次使用 GitHub 登录会自动注册站内账号。</div>
         </template>
 
         <template v-else>
@@ -804,7 +803,7 @@ function handleAvatarChange(event: Event): void {
 
           <div class="action-row action-row--end">
             <ZButton type="primary" :disabled="busy" :loading="isRegistering" @click="submitRegister">
-              注册并登录
+              立即注册
             </ZButton>
           </div>
         </template>
@@ -818,6 +817,7 @@ function handleAvatarChange(event: Event): void {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 }
 
 .panel-card {
@@ -854,6 +854,10 @@ function handleAvatarChange(event: Event): void {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.auth-card {
+  flex: 1;
 }
 
 .profile-header {

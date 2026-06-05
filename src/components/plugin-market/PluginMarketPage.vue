@@ -1061,7 +1061,6 @@ onUnmounted(() => {
 
     <aside class="side-nav">
       <div class="side-nav-header">
-        <div class="side-nav-title">邪恶的熊</div>
         <div class="side-nav-subtitle">你需要有独当一面的能力<br>才能避免引火烧身</div>
       </div>
 

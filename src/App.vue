@@ -23,8 +23,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { Toast as ToastComponent, useToast } from './components/common/Toast'
-import { ConfirmDialog } from './components/common/ConfirmDialog'
+import { Toast as ToastComponent, useToast, ConfirmDialog } from './components/common'
 import PluginMarketPage from './components/plugin-market/PluginMarketPage.vue'
 import { useTheme } from './config/theme'
 

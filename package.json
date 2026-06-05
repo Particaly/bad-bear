@@ -11,7 +11,7 @@
     "@vueuse/core": "^14.2.1",
     "marked": "^17.0.5",
     "vue": "^3.5.13",
-    "ztools-ui": "file:.yalc/ztools-ui"
+    "ztools-ui": "0.1.2"
   },
   "devDependencies": {
     "@iconify/utils": "^3.1.0",

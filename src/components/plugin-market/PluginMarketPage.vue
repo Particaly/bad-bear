@@ -12,7 +12,7 @@ import {
   readMarketInstalledPluginHashes,
   streamPluginMarket,
 } from '../../api/pluginMarket'
-import { useToast } from '../common/Toast'
+import { useToast } from '../common'
 import { useMarketRiskDialog } from '../../app/useMarketRiskDialog'
 import authGuideImage from '../../assets/image/image.png?url'
 import type {
@@ -963,6 +963,19 @@ onMounted(() => {
   syncNotificationStream()
   syncStoreSubInput()
   void reloadMarket()
+
+  // 立即检查并弹出风险提示，不依赖 onPluginEnter 事件
+  if (!hasDismissedMarketRiskDialog.value) {
+    void openMarketRiskDialog().then((confirmed) => {
+      if (confirmed) {
+        scheduleAuthGuide()
+      }
+    })
+  } else {
+    scheduleAuthGuide()
+  }
+
+  // 也监听 onPluginEnter 事件，以防有其他场景需要
   window.ztools.onPluginEnter(() => {
     if (!hasDismissedMarketRiskDialog.value) {
       void openMarketRiskDialog().then((confirmed) => {
@@ -974,6 +987,7 @@ onMounted(() => {
       scheduleAuthGuide()
     }
   })
+
   window.addEventListener('keydown', handleKeydown, true)
 })
 

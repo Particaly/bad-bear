@@ -1305,8 +1305,10 @@ webpack-virtual-modules@^0.6.2:
   resolved "https://registry.yarnpkg.com/webpack-virtual-modules/-/webpack-virtual-modules-0.6.2.tgz#057faa9065c8acf48f24cb57ac0e77739ab9a7e8"
   integrity sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==
 
-"ztools-ui@file:.yalc/ztools-ui":
-  version "0.1.1"
+ztools-ui@0.1.2:
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/ztools-ui/-/ztools-ui-0.1.2.tgz#f42823d98c8a9c33bf0862bcf7235d222cce0b3d"
+  integrity sha512-qUfHxjfV9/uDSxHSWFm6v20KcsLWwROHmpRI3XkhyiycsjWqKrEwUWUC9n2E8q3fxPAeVkfjl2DATNGDvkgR4A==
   dependencies:
     "@vueuse/core" "^12.7.0"
     marked "^15.0.7"

@@ -33,6 +33,14 @@ const MARKET_RISK_ITEMS = [
     label: '禁止上传有版权风险、破解付费的插件，本应用只是为了方便大家分享插件！',
   },
   {
+    key: 'technical-exchange-only',
+    label: '插件内容仅供技术交流与学习参考，下载后请在 24 小时内删除，请勿用于商业用途或其他侵权场景。',
+  },
+  {
+    key: 'infringement-contact',
+    label: '如发现插件内容涉及侵权或其他违规问题，请联系 admin@ydys.cc 处理。',
+  },
+  {
     key: 'no-data-retention-guarantee',
     label: '本市场是玩票性质的插件市场，不对任何数据存留做保证，随时跑路。',
   },

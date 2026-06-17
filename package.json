@@ -1,6 +1,6 @@
 {
   "name": "bad-bear",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "轻松分享你的ZTools插件",
   "type": "module",
   "scripts": {
